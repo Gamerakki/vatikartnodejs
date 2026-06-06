@@ -62,7 +62,7 @@ export class CompanyRepository {
       socialMediaBatch.map((item) =>
         prisma.companySocialMediaMapper.upsert({
           where: {
-            companyId_socialMediaId: {
+            socialMediaId_companyId: {
               companyId: companyIdBig,
               socialMediaId: BigInt(item.socialMediaId),
             },
