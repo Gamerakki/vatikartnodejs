@@ -1,5 +1,6 @@
 import { catalogueRepository } from './catalogue.repository';
 import { companyRepository } from '../company/company.repository';
+import { productRepository } from '../product/product.repository';
 import { SaveCatalogueReq, SaveCatalogueRes, CatalogRes, CatalogueQueryParams, SoftDeleteRestoreCatalogueReq } from './catalogue.interface';
 import { sanitizeString, generateRandom12DigitString } from '../../utils/common';
 
@@ -109,6 +110,14 @@ export class CatalogueService {
 
   async fetchRestoredCatalogueData(catalogueIds: number[]): Promise<CatalogRes[]> {
     return await catalogueRepository.fetchRestoredCataloguesDataViaCatalogueIds(catalogueIds);
+  }
+
+  async fetchPublicCatalogueProducts(catalogueId: number) {
+    const catalogue = await catalogueRepository.fetchPublicCatalogueData(catalogueId);
+    if (!catalogue) {
+      throw new Error('Catalogue not found');
+    }
+    return await productRepository.fetchProductsByCatalogue(catalogueId, catalogue.companyId);
   }
 }
 

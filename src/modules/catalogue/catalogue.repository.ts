@@ -288,6 +288,23 @@ export class CatalogueRepository {
       thumbnail_images: '',
     }));
   }
+
+  async fetchPublicCatalogueData(catalogueId: number): Promise<{ catalogueId: number; companyId: number } | null> {
+    const catalogue = await prisma.catalogue.findFirst({
+      where: {
+        catalogueId: BigInt(catalogueId),
+        isDeleted: false,
+        isPublished: true,
+      },
+    });
+
+    if (!catalogue) return null;
+
+    return {
+      catalogueId: Number(catalogue.catalogueId),
+      companyId: Number(catalogue.companyId),
+    };
+  }
 }
 
 export const catalogueRepository = new CatalogueRepository();

@@ -230,6 +230,35 @@ export class CatalogueController {
       });
     }
   }
+
+  async fetchPublicCatalogueProducts(req: Request, res: Response): Promise<void> {
+    const catalogueId = parseInt(req.params.catalogue_id, 10);
+
+    if (isNaN(catalogueId)) {
+      res.status(400).json({
+        status: false,
+        msg: 'Invalid catalogue_id',
+      });
+      return;
+    }
+
+    try {
+      const products = await catalogueService.fetchPublicCatalogueProducts(catalogueId);
+      res.status(200).json({
+        status: true,
+        msg: 'Public catalogue products fetched successfully!',
+        data: products,
+      });
+    } catch (err) {
+      const msg = (err as Error).message;
+      const status = msg === 'Catalogue not found' ? 404 : 500;
+      res.status(status).json({
+        status: false,
+        msg: msg === 'Catalogue not found' ? 'Catalogue not found' : 'An error occurred',
+        error: msg,
+      });
+    }
+  }
 }
 
 export const catalogueController = new CatalogueController();

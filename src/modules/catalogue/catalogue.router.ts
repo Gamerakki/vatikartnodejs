@@ -4,7 +4,10 @@ import { validateAuth } from '../../middlewares/auth';
 
 const router = Router();
 
-// All catalogue routes require authentication
+// Public catalogue routes
+router.get('/public/:catalogue_id/products', catalogueController.fetchPublicCatalogueProducts);
+
+// All other catalogue routes require authentication
 router.use(validateAuth);
 
 router.post('/save', catalogueController.saveCatalogue);
