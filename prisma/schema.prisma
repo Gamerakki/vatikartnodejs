@@ -72,7 +72,7 @@ model CompanySocialMediaMapper {
   company           Company           @relation(fields: [companyId], references: [companyId], onDelete: Cascade, onUpdate: Cascade)
   socialMediaMaster SocialMediaMaster @relation(fields: [socialMediaId], references: [socialMediaId], onDelete: Cascade, onUpdate: Cascade)
 
-  @@unique([companyId, socialMediaId])
+  @@unique([socialMediaId, companyId])
   @@map("company_social_media_mapper")
 }
 
