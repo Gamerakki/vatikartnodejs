@@ -57,6 +57,7 @@ model Company {
   catalogues         Catalogue[]
   products           Product[]
   orders             Order[]
+  subscription       Subscription?
 
   @@map("company")
 }
@@ -226,4 +227,19 @@ model OrderItem {
   product           Product  @relation(fields: [productId], references: [productId])
 
   @@map("order_items")
+}
+
+model Subscription {
+  subscriptionId BigInt    @id @default(autoincrement()) @map("subscription_id")
+  companyId      BigInt    @unique @map("company_id")
+  planName       String    @default("FREE") @map("plan_name") @db.VarChar(50)
+  startDate      DateTime  @default(now()) @map("start_date") @db.Timestamptz
+  endDate        DateTime? @map("end_date") @db.Timestamptz
+  status         String    @default("ACTIVE") @db.VarChar(20)
+  pricePaid      Decimal   @default(0) @map("price_paid") @db.Decimal(10, 2)
+  updatedDate    DateTime? @map("updated_date") @db.Timestamptz
+
+  company        Company   @relation(fields: [companyId], references: [companyId], onDelete: Cascade)
+
+  @@map("subscriptions")
 }
