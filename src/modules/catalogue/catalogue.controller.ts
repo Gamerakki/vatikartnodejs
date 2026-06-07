@@ -236,19 +236,20 @@ export class CatalogueController {
     const catalogueId = parseInt(idParam, 10);
 
     try {
-      let products;
+      let result;
       if (isNaN(catalogueId)) {
         // Param is a slug!
-        products = await catalogueService.fetchPublicCatalogueProducts(idParam);
+        result = await catalogueService.fetchPublicCatalogueProducts(idParam);
       } else {
         // Param is an ID!
-        products = await catalogueService.fetchPublicCatalogueProducts(catalogueId);
+        result = await catalogueService.fetchPublicCatalogueProducts(catalogueId);
       }
 
       res.status(200).json({
         status: true,
         msg: 'Public catalogue products fetched successfully!',
-        data: products,
+        title: result.title,
+        data: result.products,
       });
     } catch (err) {
       const msg = (err as Error).message;

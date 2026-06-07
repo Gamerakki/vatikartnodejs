@@ -129,7 +129,11 @@ export class CatalogueService {
     if (!catalogue) {
       throw new Error('Catalogue not found');
     }
-    return await productRepository.fetchProductsByCatalogue(targetId, catalogue.companyId);
+    const products = await productRepository.fetchProductsByCatalogue(targetId, catalogue.companyId);
+    return {
+      title: catalogue.title,
+      products,
+    };
   }
 }
 

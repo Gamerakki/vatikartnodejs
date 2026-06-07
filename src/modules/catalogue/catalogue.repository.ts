@@ -294,7 +294,7 @@ export class CatalogueRepository {
     }));
   }
 
-  async fetchPublicCatalogueData(catalogueId: number): Promise<{ catalogueId: number; companyId: number } | null> {
+  async fetchPublicCatalogueData(catalogueId: number): Promise<{ catalogueId: number; companyId: number; title: string } | null> {
     const catalogue = await prisma.catalogue.findFirst({
       where: {
         catalogueId: BigInt(catalogueId),
@@ -308,10 +308,11 @@ export class CatalogueRepository {
     return {
       catalogueId: Number(catalogue.catalogueId),
       companyId: Number(catalogue.companyId),
+      title: catalogue.catalogue || '',
     };
   }
 
-  async fetchPublicCatalogueDataBySlug(slug: string): Promise<{ catalogueId: number; companyId: number } | null> {
+  async fetchPublicCatalogueDataBySlug(slug: string): Promise<{ catalogueId: number; companyId: number; title: string } | null> {
     const catalogue = await prisma.catalogue.findFirst({
       where: {
         slug: slug,
@@ -325,6 +326,7 @@ export class CatalogueRepository {
     return {
       catalogueId: Number(catalogue.catalogueId),
       companyId: Number(catalogue.companyId),
+      title: catalogue.catalogue || '',
     };
   }
 }
