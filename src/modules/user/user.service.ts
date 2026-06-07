@@ -85,12 +85,14 @@ export class UserService {
   }
 
   async isUserActive(userId: number): Promise<boolean> {
+    if (!redis) return false;
     const key = `user:active:${userId}`;
     const exists = await redis.exists(key);
     return exists === 1;
   }
 
   async updateUserActivity(userId: number): Promise<void> {
+    if (!redis) return;
     const key = `user:active:${userId}`;
     const timestamp = Math.floor(Date.now() / 1000).toString();
     // 20 minutes expiry = 1200 seconds

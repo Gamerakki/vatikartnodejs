@@ -38,8 +38,10 @@ async function bootstrap() {
       }
 
       try {
-        await redis.quit();
-        logger.info('Redis connection closed.');
+        if (redis) {
+          await redis.quit();
+          logger.info('Redis connection closed.');
+        }
       } catch (err) {
         logger.error('Error closing Redis', err);
       }
