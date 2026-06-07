@@ -66,8 +66,17 @@ export async function uploadToR2(
   return randomFileName;
 }
 
+interface MulterFile {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+}
+
 export async function uploadFile(
-  file: Express.Multer.File,
+  file: MulterFile,
   validations: FileValidations
 ): Promise<string> {
   if (validations.uploadLocation !== 'local' && validations.uploadLocation !== 'r2') {
@@ -99,7 +108,7 @@ export async function uploadFile(
 
 export async function uploadMultipleParallelToR2(
   folderName: string,
-  files: Express.Multer.File[]
+  files: MulterFile[]
 ): Promise<string[]> {
   const uploadPromises = files.map((file) =>
     uploadToR2(folderName, file.buffer, file.originalname, file.mimetype)
