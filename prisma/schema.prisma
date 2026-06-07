@@ -18,6 +18,7 @@ model User {
   addedDate      DateTime   @default(now()) @map("added_date") @db.Timestamptz
   profilePicPath String     @default("") @map("profile_pic_path") @db.Text
   lastActiveTime DateTime?  @map("last_active_time") @db.Timestamptz
+  isAdmin        Boolean    @default(false) @map("is_admin")
 
   // Self relations
   creator        User?      @relation("UserToUser", fields: [addedBy], references: [userId], onDelete: Cascade, onUpdate: Cascade)
@@ -103,6 +104,8 @@ model Catalogue {
   updatedByUser User?   @relation("CatalogueUpdatedBy", fields: [updatedBy], references: [userId], onDelete: SetNull, onUpdate: Cascade)
 
   products Product[]
+
+  visitorMappers CatalogueVisitorMapper[]
 
   @@map("catalogues")
 }
@@ -242,4 +245,15 @@ model Subscription {
   company        Company   @relation(fields: [companyId], references: [companyId], onDelete: Cascade)
 
   @@map("subscriptions")
+}
+
+model CatalogueVisitorMapper {
+  id          BigInt    @id @default(autoincrement())
+  catalogueId BigInt    @map("catalogue_id")
+  customerId  BigInt    @map("customer_id")
+  visitedAt   DateTime  @default(now()) @map("visited_at") @db.Timestamptz
+
+  catalogue   Catalogue @relation(fields: [catalogueId], references: [catalogueId], onDelete: Cascade)
+
+  @@map("catalogue_visitor_mapper")
 }

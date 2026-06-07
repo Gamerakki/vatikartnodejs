@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "dbapp": "npm start --prefix ../VatiKart/dbui"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.500.0",
