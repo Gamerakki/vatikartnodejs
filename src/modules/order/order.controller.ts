@@ -194,7 +194,17 @@ export class OrderController {
     }
 
     try {
-      const result = await orderService.bookOrder(parseResult.data.catalogue_id, parseResult.data);
+      let targetCatalogueId = parseResult.data.catalogue_id;
+      if (typeof targetCatalogueId === 'string') {
+        const { catalogueRepository } = require('../catalogue/catalogue.repository');
+        const catalogueData = await catalogueRepository.fetchPublicCatalogueDataBySlug(targetCatalogueId);
+        if (!catalogueData) {
+          throw new Error('Catalogue not found');
+        }
+        targetCatalogueId = catalogueData.catalogueId;
+      }
+      
+      const result = await orderService.bookOrder(targetCatalogueId as number, parseResult.data);
       res.status(200).json({
         status: true,
         msg: 'Order placed successfully!',

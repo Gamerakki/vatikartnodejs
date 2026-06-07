@@ -28,7 +28,7 @@ export const bookOrderItemSchema = z.object({
 });
 
 export const bookOrderSchema = z.object({
-  catalogue_id: z.number({ required_error: 'catalogue_id is required' }),
+  catalogue_id: z.union([z.number(), z.string()], { required_error: 'catalogue_id is required' }),
   customer_name: z.string().min(1, { message: 'customer_name is required' }).max(255),
   customer_phone: z.string().min(1, { message: 'customer_phone is required' }).max(20),
   customer_address: z.string().min(1, { message: 'customer_address is required' }),
