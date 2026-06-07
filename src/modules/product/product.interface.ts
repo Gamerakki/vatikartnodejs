@@ -35,6 +35,7 @@ export interface ProductListItemRes {
   sku: string | null;
   price: number | null;
   img_path: string | null;
+  images?: string[];
   slug: string | null;
   total_stock: number;
   size_count: number;

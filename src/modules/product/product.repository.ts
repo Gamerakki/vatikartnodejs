@@ -75,6 +75,7 @@ export class ProductRepository {
         sku: p.sku,
         price: p.price ? Number(p.price) : null,
         img_path: p.images[0]?.productImgPath || null,
+        images: p.images.map((img: any) => img.productImgPath),
         slug: p.slug,
         total_stock: totalStock,
         size_count: sizesOptions.length,
