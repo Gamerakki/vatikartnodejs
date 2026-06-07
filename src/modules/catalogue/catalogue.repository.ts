@@ -20,6 +20,7 @@ export class CatalogueRepository {
           companyId: BigInt(data.companyId || 0),
           addedBy: BigInt(data.addedBy || 0),
           slug: data.slug || null,
+          isPublished: true,
           addedDate: now,
         },
       });
@@ -36,6 +37,7 @@ export class CatalogueRepository {
       data: {
         catalogue: data.catalogue,
         updatedBy: BigInt(data.updatedBy || 0),
+        isPublished: true,
         updatedDate: now,
       },
     });
