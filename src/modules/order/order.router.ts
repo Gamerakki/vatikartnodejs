@@ -4,7 +4,10 @@ import { validateAuth } from '../../middlewares/auth';
 
 const router = Router();
 
-// All order routes require auth
+// Public order booking (does not require auth)
+router.post('/public/book', orderController.bookOrder);
+
+// All other order routes require auth
 router.use(validateAuth);
 
 router.get('/fetch-list', orderController.fetchOrders);

@@ -35,52 +35,65 @@ export class ProductRepository {
     catalogueId: number,
     companyId: number
   ): Promise<ProductListItemRes[]> {
-    const rawProducts = await prisma.$queryRaw<any[]>`
-      SELECT 
-        p.product_id,
-        p.product,
-        p.sku,
-        p.price,
-        p.slug,
-        pi.product_img_path,
-        COALESCE(inv.total_stock, 0)::int as total_stock,
-        COALESCE(sz.size_count, 0)::int as size_count
-      FROM products p
-      LEFT JOIN LATERAL (
-        SELECT product_img_path
-        FROM product_images
-        WHERE product_id = p.product_id
-        ORDER BY product_img_id ASC
-        LIMIT 1
-      ) pi ON true
-      LEFT JOIN (
-        SELECT product_id, COUNT(*) AS size_count
-        FROM product_variant_options
-        WHERE option_type = 'size'
-        GROUP BY product_id
-      ) sz ON sz.product_id = p.product_id
-      LEFT JOIN (
-        SELECT pvi.product_id, SUM(pvi.quantity) AS total_stock
-        FROM product_variant_inventories pvi
-        JOIN product_variant_options pvo ON pvo.option_id = pvi.option_id AND pvo.option_type = 'size'
-        GROUP BY pvi.product_id
-      ) inv ON inv.product_id = p.product_id
-      WHERE p.catalogue_id = ${BigInt(catalogueId)} 
-        AND p.company_id = ${BigInt(companyId)} 
-        AND p.is_deleted = false
-      ORDER BY p.product_id DESC
-    `;
+    const products = await prisma.product.findMany({
+      where: {
+        catalogueId: BigInt(catalogueId),
+        companyId: BigInt(companyId),
+        isDeleted: false,
+      },
+      include: {
+        images: {
+          orderBy: { productImgId: 'asc' },
+          take: 1,
+        },
+        variantOptions: {
+          include: {
+            inventories: true,
+          },
+          orderBy: [{ sortOrder: 'asc' }, { optionId: 'asc' }],
+        },
+        bulkDiscounts: {
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+      orderBy: { productId: 'desc' },
+    });
 
-    return rawProducts.map((row) => ({
-      product_id: Number(row.product_id),
-      product: row.product,
-      sku: row.sku,
-      price: row.price ? Number(row.price) : null,
-      img_path: row.product_img_path || null,
-      slug: row.slug,
-      total_stock: Number(row.total_stock),
-      size_count: Number(row.size_count),
-    }));
+    return products.map((p) => {
+      const sizesOptions = p.variantOptions.filter((o) => o.optionType === 'size');
+      const colorsOptions = p.variantOptions.filter((o) => o.optionType === 'color');
+
+      let totalStock = 0;
+      sizesOptions.forEach((o) => {
+        const qty = o.inventories.reduce((sum, inv) => sum + inv.quantity, 0);
+        totalStock += qty;
+      });
+
+      return {
+        product_id: Number(p.productId),
+        product: p.product,
+        sku: p.sku,
+        price: p.price ? Number(p.price) : null,
+        img_path: p.images[0]?.productImgPath || null,
+        slug: p.slug,
+        total_stock: totalStock,
+        size_count: sizesOptions.length,
+        description: p.description,
+        sizes: sizesOptions.map((o) => o.label),
+        colors: colorsOptions.map((o) => ({
+          name: o.label,
+          hex: o.accent,
+        })),
+        bulk_discounts: p.bulkDiscounts.map((d) => ({
+          slab_id: Number(d.slabId),
+          min_qty: d.minQty,
+          max_qty: d.maxQty,
+          discounted_price: d.discountedPrice ? Number(d.discountedPrice) : null,
+          discount_percent: d.discountPercent ? Number(d.discountPercent) : null,
+          sort_order: d.sortOrder,
+        })),
+      };
+    });
   }
 
   async saveBasicInfo(
@@ -290,6 +303,173 @@ export class ProductRepository {
       label: r.label,
       quantity: Number(r.quantity),
     }));
+  }
+
+  async fetchInventoryList(companyId: number): Promise<any[]> {
+    const products = await prisma.product.findMany({
+      where: {
+        companyId: BigInt(companyId),
+        isDeleted: false,
+      },
+      include: {
+        variantOptions: {
+          where: { optionType: 'size' },
+          include: {
+            inventories: true,
+          },
+          orderBy: [{ sortOrder: 'asc' }, { optionId: 'asc' }],
+        },
+      },
+      orderBy: { product: 'asc' },
+    });
+
+    return products.map((p) => {
+      let totalStock = 0;
+      p.variantOptions.forEach((o) => {
+        totalStock += o.inventories.reduce((sum, inv) => sum + inv.quantity, 0);
+      });
+
+      let status: 'OUT_OF_STOCK' | 'LOW_STOCK' | 'IN_STOCK' = 'IN_STOCK';
+      if (totalStock === 0) {
+        status = 'OUT_OF_STOCK';
+      } else if (totalStock <= p.reorderLevel) {
+        status = 'LOW_STOCK';
+      }
+
+      return {
+        id: p.productId.toString(),
+        productId: p.productId.toString(),
+        productName: p.product,
+        sku: p.sku || '',
+        quantity: totalStock,
+        reorderLevel: p.reorderLevel,
+        maxStock: p.maxStock,
+        lastRestocked: p.updatedDate ? p.updatedDate.toISOString() : p.addedDate.toISOString(),
+        status,
+      };
+    });
+  }
+
+  async fetchInventoryStats(companyId: number): Promise<any> {
+    const products = await prisma.product.findMany({
+      where: {
+        companyId: BigInt(companyId),
+        isDeleted: false,
+      },
+      include: {
+        variantOptions: {
+          where: { optionType: 'size' },
+          include: {
+            inventories: true,
+          },
+        },
+      },
+    });
+
+    let totalItems = 0;
+    let totalQuantity = 0;
+    let lowStockItems = 0;
+    let outOfStockItems = 0;
+
+    products.forEach((p) => {
+      totalItems += 1;
+      let totalStock = 0;
+      p.variantOptions.forEach((o) => {
+        totalStock += o.inventories.reduce((sum, inv) => sum + inv.quantity, 0);
+      });
+
+      totalQuantity += totalStock;
+
+      if (totalStock === 0) {
+        outOfStockItems += 1;
+      } else if (totalStock <= p.reorderLevel) {
+        lowStockItems += 1;
+      }
+    });
+
+    return {
+      totalItems,
+      totalQuantity,
+      lowStockItems,
+      outOfStockItems,
+    };
+  }
+
+  async restockInventory(productId: number, companyId: number, amount: number): Promise<boolean> {
+    const prodBig = BigInt(productId);
+    const compBig = BigInt(companyId);
+
+    // Verify product exists and belongs to company
+    const product = await prisma.product.findFirst({
+      where: { productId: prodBig, companyId: compBig, isDeleted: false },
+      include: {
+        variantOptions: {
+          where: { optionType: 'size' },
+          orderBy: [{ sortOrder: 'asc' }, { optionId: 'asc' }],
+        },
+      },
+    });
+
+    if (!product) {
+      throw new Error('Product not found');
+    }
+
+    return await prisma.$transaction(async (tx) => {
+      let sizeOptions = product.variantOptions;
+
+      // Fallback: If no size variants exist, create a default "One Size" variant option
+      if (sizeOptions.length === 0) {
+        const newOption = await tx.productVariantOption.create({
+          data: {
+            productId: prodBig,
+            optionType: 'size',
+            label: 'One Size',
+            sortOrder: 0,
+          },
+        });
+        sizeOptions = [newOption];
+      }
+
+      const N = sizeOptions.length;
+      const baseQty = Math.floor(amount / N);
+      const remainder = amount % N;
+
+      // Update/Upsert stock count for each size option
+      for (let i = 0; i < N; i += 1) {
+        const option = sizeOptions[i];
+        const addAmount = baseQty + (i === 0 ? remainder : 0);
+
+        // Find existing inventory
+        const existingInv = await tx.productVariantInventory.findFirst({
+          where: { productId: prodBig, optionId: option.optionId },
+        });
+
+        if (existingInv) {
+          const newQty = Math.min(existingInv.quantity + addAmount, product.maxStock);
+          await tx.productVariantInventory.update({
+            where: { inventoryId: existingInv.inventoryId },
+            data: { quantity: newQty },
+          });
+        } else {
+          const newQty = Math.min(addAmount, product.maxStock);
+          await tx.productVariantInventory.create({
+            data: {
+              productId: prodBig,
+              optionId: option.optionId,
+              quantity: newQty,
+            },
+          });
+        }
+      }
+
+      // Update product's updated date
+      await tx.product.update({
+        where: { productId: prodBig },
+        data: { updatedDate: new Date() },
+      });
+
+      return true;
+    });
   }
 }
 

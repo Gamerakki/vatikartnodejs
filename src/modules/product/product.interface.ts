@@ -38,6 +38,10 @@ export interface ProductListItemRes {
   slug: string | null;
   total_stock: number;
   size_count: number;
+  description?: string | null;
+  sizes?: string[];
+  colors?: { name: string; hex: string | null }[];
+  bulk_discounts?: BulkDiscountSlabRes[];
 }
 
 export interface BulkDiscountSlabReq {
@@ -132,3 +136,23 @@ export interface ProductInventoryRes {
   size_count: number;
   items: InventoryItemRes[];
 }
+
+export interface ShopInventoryItemRes {
+  id: string;
+  productId: string;
+  productName: string;
+  sku: string;
+  quantity: number;
+  reorderLevel: number;
+  maxStock: number;
+  lastRestocked: string;
+  status: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK';
+}
+
+export interface ShopInventoryStatsRes {
+  totalItems: number;
+  totalQuantity: number;
+  lowStockItems: number;
+  outOfStockItems: number;
+}
+

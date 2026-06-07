@@ -6,6 +6,7 @@ import {
   saveBasicInfoSchema,
   saveVariantOptionsSchema,
   saveInventorySchema,
+  restockInventorySchema,
 } from './product.validation';
 
 export class ProductController {
@@ -269,6 +270,85 @@ export class ProductController {
       res.status(httpStatus).json({
         status: false,
         msg: msg === 'product not found' ? 'product not found' : 'An error occurred',
+        error: msg,
+      });
+    }
+  }
+
+  async fetchInventoryList(req: Request, res: Response): Promise<void> {
+    const loggedInUserId = res.locals.userId || 0;
+
+    try {
+      const list = await productService.fetchInventoryList(loggedInUserId);
+      res.status(200).json({
+        status: true,
+        msg: 'Inventory list fetched successfully!',
+        data: list,
+      });
+    } catch (err) {
+      res.status(500).json({
+        status: false,
+        msg: 'An error occurred',
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  async fetchInventoryStats(req: Request, res: Response): Promise<void> {
+    const loggedInUserId = res.locals.userId || 0;
+
+    try {
+      const stats = await productService.fetchInventoryStats(loggedInUserId);
+      res.status(200).json({
+        status: true,
+        msg: 'Inventory statistics fetched successfully!',
+        data: stats,
+      });
+    } catch (err) {
+      res.status(500).json({
+        status: false,
+        msg: 'An error occurred',
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  async restockInventory(req: Request, res: Response): Promise<void> {
+    const parseResult = restockInventorySchema.safeParse(req.body);
+
+    if (!parseResult.success) {
+      const formattedErrors: Record<string, string> = {};
+      parseResult.error.issues.forEach((issue) => {
+        const fieldPath = issue.path.join('.');
+        formattedErrors[fieldPath] = issue.message;
+      });
+
+      res.status(501).json({
+        status: false,
+        msg: 'Validation errors',
+        error: formattedErrors,
+      });
+      return;
+    }
+
+    const loggedInUserId = res.locals.userId || 0;
+
+    try {
+      const success = await productService.restockInventory(
+        loggedInUserId,
+        parseResult.data.product_id,
+        parseResult.data.quantity
+      );
+      res.status(200).json({
+        status: success,
+        msg: 'Product inventory restocked successfully!',
+      });
+    } catch (err) {
+      const msg = (err as Error).message;
+      const httpStatus = msg === 'Product not found' ? 404 : 500;
+      res.status(httpStatus).json({
+        status: false,
+        msg: msg === 'Product not found' ? 'Product not found' : 'An error occurred',
         error: msg,
       });
     }

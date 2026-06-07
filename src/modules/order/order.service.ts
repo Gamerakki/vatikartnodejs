@@ -51,6 +51,28 @@ export class OrderService {
 
     return await orderRepository.updateOrderShipping(orderId, companyId, shipping);
   }
+
+  async bookOrder(
+    catalogueId: number,
+    data: {
+      customer_name: string;
+      customer_phone: string;
+      customer_address: string;
+      subtotal: number;
+      discount: number;
+      shipping: number;
+      total: number;
+      items: {
+        product_id: number;
+        qty: number;
+        price: number;
+        selected_size?: string | null;
+        selected_color?: string | null;
+      }[];
+    }
+  ) {
+    return await orderRepository.bookOrder(catalogueId, data);
+  }
 }
 
 export const orderService = new OrderService();

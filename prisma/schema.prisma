@@ -131,6 +131,8 @@ model Product {
   slug            String?   @db.Text
   isDeleted       Boolean   @default(false) @map("is_deleted")
   catalogueId     BigInt    @map("catalogue_id")
+  reorderLevel    Int       @default(5) @map("reorder_level")
+  maxStock        Int       @default(100) @map("max_stock")
 
   // Relations
   company       Company   @relation(fields: [companyId], references: [companyId], onDelete: Cascade, onUpdate: Cascade)

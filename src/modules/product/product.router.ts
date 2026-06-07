@@ -17,4 +17,8 @@ router.patch('/save-inventory', productController.saveInventory);
 router.get('/fetch-basic-info/:product_id', productController.fetchBasicInfo);
 router.get('/fetch-inventory/:product_id', productController.fetchInventory);
 
+router.get('/inventory/list', productController.fetchInventoryList);
+router.get('/inventory/stats', productController.fetchInventoryStats);
+router.patch('/inventory/restock', productController.restockInventory);
+
 export const productRouter = router;

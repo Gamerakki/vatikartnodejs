@@ -13,6 +13,8 @@ import {
   BasicInfoRes,
   SaveInventoryReq,
   ProductInventoryRes,
+  ShopInventoryItemRes,
+  ShopInventoryStatsRes,
 } from './product.interface';
 import { generatePresignedUploadURL } from '../../utils/s3';
 
@@ -211,6 +213,21 @@ export class ProductService {
       size_count: items.length,
       items,
     };
+  }
+
+  async fetchInventoryList(loggedInUserId: number): Promise<ShopInventoryItemRes[]> {
+    const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
+    return await productRepository.fetchInventoryList(companyId);
+  }
+
+  async fetchInventoryStats(loggedInUserId: number): Promise<ShopInventoryStatsRes> {
+    const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
+    return await productRepository.fetchInventoryStats(companyId);
+  }
+
+  async restockInventory(loggedInUserId: number, productId: number, amount: number): Promise<boolean> {
+    const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
+    return await productRepository.restockInventory(productId, companyId, amount);
   }
 }
 

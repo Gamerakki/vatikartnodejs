@@ -4,6 +4,7 @@ import {
   updateOrderStatusSchema,
   updateOrderDiscountSchema,
   updateOrderShippingSchema,
+  bookOrderSchema,
 } from './order.validation';
 
 export class OrderController {
@@ -169,6 +170,42 @@ export class OrderController {
       res.status(status).json({
         status: false,
         msg: 'An error occurred',
+        error: msg,
+      });
+    }
+  }
+
+  async bookOrder(req: Request, res: Response): Promise<void> {
+    const parseResult = bookOrderSchema.safeParse(req.body);
+
+    if (!parseResult.success) {
+      const formattedErrors: Record<string, string> = {};
+      parseResult.error.issues.forEach((issue) => {
+        const fieldPath = issue.path.join('.');
+        formattedErrors[fieldPath] = issue.message;
+      });
+
+      res.status(501).json({
+        status: false,
+        msg: 'Validation errors',
+        error: formattedErrors,
+      });
+      return;
+    }
+
+    try {
+      const result = await orderService.bookOrder(parseResult.data.catalogue_id, parseResult.data);
+      res.status(200).json({
+        status: true,
+        msg: 'Order placed successfully!',
+        data: result,
+      });
+    } catch (err) {
+      const msg = (err as Error).message;
+      const httpStatus = msg === 'Catalogue not found' ? 404 : 500;
+      res.status(httpStatus).json({
+        status: false,
+        msg: msg === 'Catalogue not found' ? 'Catalogue not found' : 'An error occurred',
         error: msg,
       });
     }

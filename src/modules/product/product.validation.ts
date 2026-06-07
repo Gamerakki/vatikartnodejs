@@ -66,3 +66,9 @@ export const saveInventorySchema = z.object({
   product_id: z.number({ required_error: 'The field product_id is required' }),
   items: z.array(inventoryItemSchema).optional(),
 });
+
+export const restockInventorySchema = z.object({
+  product_id: z.number({ required_error: 'The field product_id is required' }),
+  quantity: z.number().min(1, { message: 'quantity must be at least 1' }),
+});
+
