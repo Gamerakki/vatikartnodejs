@@ -55,6 +55,10 @@ export const saveVariantOptionsSchema = z.object({
   product_id: z.number({ required_error: 'The field product_id is required' }),
   sizes: z.array(variantOptionSchema).optional(),
   colors: z.array(variantOptionSchema).optional(),
+  custom_options: z.array(z.object({
+    type: z.string().min(1),
+    options: z.array(variantOptionSchema),
+  })).optional(),
 });
 
 export const inventoryItemSchema = z.object({

@@ -76,6 +76,10 @@ export interface SaveVariantOptionsReq {
   product_id: number;
   sizes?: VariantOptionReq[];
   colors?: VariantOptionReq[];
+  custom_options?: {
+    type: string;
+    options: VariantOptionReq[];
+  }[];
 }
 
 export interface InventoryItemReq {
@@ -107,6 +111,10 @@ export interface VariantOptionRes {
 export interface ProductVariantsRes {
   sizes: VariantOptionRes[];
   colors: VariantOptionRes[];
+  custom_options: {
+    type: string;
+    options: VariantOptionRes[];
+  }[];
 }
 
 export interface BasicInfoRes {

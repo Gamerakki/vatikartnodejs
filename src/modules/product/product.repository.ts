@@ -168,7 +168,7 @@ export class ProductRepository {
   async saveVariantOptions(
     productId: number,
     companyId: number,
-    options: { optionType: 'size' | 'color'; label: string; accent: string | null; sortOrder: number }[]
+    options: { optionType: string; label: string; accent: string | null; sortOrder: number }[]
   ) {
     const productIdBig = BigInt(productId);
     const companyIdBig = BigInt(companyId);

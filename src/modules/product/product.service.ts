@@ -111,7 +111,7 @@ export class ProductService {
   async saveVariantOptions(loggedInUserId: number, req: SaveVariantOptionsReq): Promise<void> {
     const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
 
-    const options: { optionType: 'size' | 'color'; label: string; accent: string | null; sortOrder: number }[] = [];
+    const options: { optionType: string; label: string; accent: string | null; sortOrder: number }[] = [];
 
     if (req.sizes) {
       req.sizes.forEach((s, index) => {
@@ -131,6 +131,19 @@ export class ProductService {
           label: c.label,
           accent: c.accent || null,
           sortOrder: c.sort_order ?? index,
+        });
+      });
+    }
+
+    if (req.custom_options) {
+      req.custom_options.forEach((co) => {
+        co.options.forEach((o, index) => {
+          options.push({
+            optionType: co.type,
+            label: o.label,
+            accent: o.accent || null,
+            sortOrder: o.sort_order ?? index,
+          });
         });
       });
     }
@@ -170,6 +183,7 @@ export class ProductService {
       variants: {
         sizes: [],
         colors: [],
+        custom_options: [],
       },
     };
 
@@ -183,8 +197,15 @@ export class ProductService {
 
       if (v.optionType === 'color') {
         res.variants.colors.push(mapped);
-      } else {
+      } else if (v.optionType === 'size') {
         res.variants.sizes.push(mapped);
+      } else {
+        let group = res.variants.custom_options.find(g => g.type === v.optionType);
+        if (!group) {
+          group = { type: v.optionType, options: [] };
+          res.variants.custom_options.push(group);
+        }
+        group.options.push(mapped);
       }
     });
 
