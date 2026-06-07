@@ -44,7 +44,6 @@ export class ProductRepository {
       include: {
         images: {
           orderBy: { productImgId: 'asc' },
-          take: 1,
         },
         variantOptions: {
           include: {
