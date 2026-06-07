@@ -19,6 +19,7 @@ model User {
   profilePicPath String     @default("") @map("profile_pic_path") @db.Text
   lastActiveTime DateTime?  @map("last_active_time") @db.Timestamptz
   isAdmin        Boolean    @default(false) @map("is_admin")
+  isDeleted      Boolean    @default(false) @map("is_deleted")
 
   // Self relations
   creator        User?      @relation("UserToUser", fields: [addedBy], references: [userId], onDelete: Cascade, onUpdate: Cascade)
@@ -49,6 +50,7 @@ model Company {
   supportPhone String?    @map("support_phone") @db.VarChar(15)
   salesEmail   String?    @map("sales_email") @db.VarChar(254)
   salesPhone   String?    @map("sales_phone") @db.VarChar(15)
+  isDeleted    Boolean    @default(false) @map("is_deleted")
 
   // Relations
   addedByUser   User?     @relation("CompanyAddedBy", fields: [addedBy], references: [userId], onDelete: Cascade, onUpdate: Cascade)
