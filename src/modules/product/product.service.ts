@@ -55,17 +55,23 @@ export class ProductService {
 
     const savedProducts = await productRepository.createProducts(productsData);
 
-    const imageEntries = savedProducts.map((saved, index) => ({
-      productId: Number(saved.productId),
-      productImgPath: req.products[index].img_path,
-    }));
+    const imageEntries: { productId: number; productImgPath: string }[] = [];
+    savedProducts.forEach((saved, index) => {
+      const paths = req.products[index].img_paths || [];
+      paths.forEach((path) => {
+        imageEntries.push({
+          productId: Number(saved.productId),
+          productImgPath: path,
+        });
+      });
+    });
 
     await productRepository.saveBulkProductImages(imageEntries);
 
     return savedProducts.map((saved, index) => ({
       product_id: Number(saved.productId),
       product: saved.product,
-      img_path: req.products[index].img_path,
+      img_paths: req.products[index].img_paths,
       slug: saved.slug,
     }));
   }

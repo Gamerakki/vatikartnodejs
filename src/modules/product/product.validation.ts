@@ -13,7 +13,7 @@ export const productFileUploadSchema = z.object({
 
 export const createProductSchema = z.object({
   product: z.string().min(1, { message: 'The field product is required' }),
-  img_path: z.string().min(1, { message: 'The field img_path is required' }),
+  img_paths: z.array(z.string()).min(1, { message: 'The field img_paths must have at least 1 item' }),
 });
 
 export const createProductBatchSchema = z.object({
