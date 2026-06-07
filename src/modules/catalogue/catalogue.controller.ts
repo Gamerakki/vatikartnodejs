@@ -232,18 +232,19 @@ export class CatalogueController {
   }
 
   async fetchPublicCatalogueProducts(req: Request, res: Response): Promise<void> {
-    const catalogueId = parseInt(req.params.catalogue_id, 10);
-
-    if (isNaN(catalogueId)) {
-      res.status(400).json({
-        status: false,
-        msg: 'Invalid catalogue_id',
-      });
-      return;
-    }
+    const idParam = req.params.catalogue_id;
+    const catalogueId = parseInt(idParam, 10);
 
     try {
-      const products = await catalogueService.fetchPublicCatalogueProducts(catalogueId);
+      let products;
+      if (isNaN(catalogueId)) {
+        // Param is a slug!
+        products = await catalogueService.fetchPublicCatalogueProducts(idParam);
+      } else {
+        // Param is an ID!
+        products = await catalogueService.fetchPublicCatalogueProducts(catalogueId);
+      }
+
       res.status(200).json({
         status: true,
         msg: 'Public catalogue products fetched successfully!',

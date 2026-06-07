@@ -112,12 +112,24 @@ export class CatalogueService {
     return await catalogueRepository.fetchRestoredCataloguesDataViaCatalogueIds(catalogueIds);
   }
 
-  async fetchPublicCatalogueProducts(catalogueId: number) {
-    const catalogue = await catalogueRepository.fetchPublicCatalogueData(catalogueId);
+  async fetchPublicCatalogueProducts(idOrSlug: number | string) {
+    let catalogue;
+    let targetId = 0;
+
+    if (typeof idOrSlug === 'number') {
+      catalogue = await catalogueRepository.fetchPublicCatalogueData(idOrSlug);
+      targetId = idOrSlug;
+    } else {
+      catalogue = await catalogueRepository.fetchPublicCatalogueDataBySlug(idOrSlug);
+      if (catalogue) {
+        targetId = catalogue.catalogueId;
+      }
+    }
+
     if (!catalogue) {
       throw new Error('Catalogue not found');
     }
-    return await productRepository.fetchProductsByCatalogue(catalogueId, catalogue.companyId);
+    return await productRepository.fetchProductsByCatalogue(targetId, catalogue.companyId);
   }
 }
 

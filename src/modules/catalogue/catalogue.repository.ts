@@ -76,6 +76,7 @@ export class CatalogueRepository {
           c.catalogue,
           c.added_date,
           c.is_published, 
+          c.slug,
           COALESCE(p.total_products_count, 0) as total_products_count,
           COALESCE(pi.thumbnail_images, '') as thumbnail_images,
           COALESCE(cvm.total_visitors, 0) as total_visitors
@@ -114,7 +115,7 @@ export class CatalogueRepository {
         WHERE c.is_deleted = ${isDeleted}
           AND c.company_id = ${companyIdBig}
           AND c.catalogue ILIKE ${'%' + params.search_txt + '%'}
-        GROUP BY c.catalogue_id, cvm.total_visitors, p.total_products_count, pi.thumbnail_images
+        GROUP BY c.catalogue_id, c.slug, cvm.total_visitors, p.total_products_count, pi.thumbnail_images
         ORDER BY c.catalogue_id DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
@@ -125,6 +126,7 @@ export class CatalogueRepository {
           c.catalogue,
           c.added_date,
           c.is_published, 
+          c.slug,
           COALESCE(p.total_products_count, 0) as total_products_count,
           COALESCE(pi.thumbnail_images, '') as thumbnail_images,
           COALESCE(cvm.total_visitors, 0) as total_visitors
@@ -162,7 +164,7 @@ export class CatalogueRepository {
         ) cvm on cvm.catalogue_id = c.catalogue_id
         WHERE c.is_deleted = ${isDeleted}
           AND c.company_id = ${companyIdBig}
-        GROUP BY c.catalogue_id, cvm.total_visitors, p.total_products_count, pi.thumbnail_images
+        GROUP BY c.catalogue_id, c.slug, cvm.total_visitors, p.total_products_count, pi.thumbnail_images
         ORDER BY c.catalogue_id DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
@@ -176,6 +178,7 @@ export class CatalogueRepository {
       total_products_count: Number(row.total_products_count),
       total_visitors: Number(row.total_visitors),
       thumbnail_images: row.thumbnail_images || '',
+      slug: row.slug || null,
     }));
   }
 
@@ -223,6 +226,7 @@ export class CatalogueRepository {
       total_products_count: 0,
       total_visitors: 0,
       thumbnail_images: '',
+      slug: catalogue.slug || null,
     };
   }
 
@@ -286,6 +290,7 @@ export class CatalogueRepository {
       total_products_count: 0,
       total_visitors: 0,
       thumbnail_images: '',
+      slug: c.slug || null,
     }));
   }
 
@@ -293,6 +298,23 @@ export class CatalogueRepository {
     const catalogue = await prisma.catalogue.findFirst({
       where: {
         catalogueId: BigInt(catalogueId),
+        isDeleted: false,
+        isPublished: true,
+      },
+    });
+
+    if (!catalogue) return null;
+
+    return {
+      catalogueId: Number(catalogue.catalogueId),
+      companyId: Number(catalogue.companyId),
+    };
+  }
+
+  async fetchPublicCatalogueDataBySlug(slug: string): Promise<{ catalogueId: number; companyId: number } | null> {
+    const catalogue = await prisma.catalogue.findFirst({
+      where: {
+        slug: slug,
         isDeleted: false,
         isPublished: true,
       },

@@ -17,6 +17,7 @@ export interface CatalogRes {
   total_products_count: number;
   total_visitors: number;
   thumbnail_images: string;
+  slug: string | null;
 }
 
 export interface CatalogueQueryParams {
