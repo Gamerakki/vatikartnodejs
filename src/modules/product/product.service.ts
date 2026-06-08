@@ -131,11 +131,10 @@ export class ProductService {
     })));
 
     const imageEntries: { productId: number; productImgPath: string }[] = [];
-    const basicInfoPromises: Promise<void>[] = [];
-    const inventoryPromises: Promise<void>[] = [];
 
-    savedProducts.forEach((saved, index) => {
-      const p = productsToCreate[index];
+    for (let i = 0; i < savedProducts.length; i++) {
+      const saved = savedProducts[i];
+      const p = productsToCreate[i];
       const imgPath = imageKeyMap.get(p.rowIndex);
       
       if (imgPath) {
@@ -145,7 +144,7 @@ export class ProductService {
         });
       }
 
-      basicInfoPromises.push(productRepository.saveBasicInfo({
+      await productRepository.saveBasicInfo({
         productId: Number(saved.productId),
         companyId: p.companyId,
         product: p.product,
@@ -158,31 +157,25 @@ export class ProductService {
         setName: null,
         minimumOrderQty: null,
         updatedBy: loggedInUserId,
-      }, []));
+      }, []);
 
       if (p.stock > 0) {
-        inventoryPromises.push(
-          productRepository.saveVariantOptions(Number(saved.productId), p.companyId, [
-            { optionType: 'size', label: 'Free Size', accent: null, sortOrder: 0 }
-          ]).then(async () => {
-             const data = await productRepository.fetchBasicInfo(Number(saved.productId), p.companyId);
-             const opt = data?.variants.find(v => v.optionType === 'size' && v.label === 'Free Size');
-             if (opt) {
-               await productRepository.saveInventory(Number(saved.productId), p.companyId, [
-                 { optionId: Number(opt.optionId), quantity: p.stock }
-               ]);
-             }
-          })
-        );
+        await productRepository.saveVariantOptions(Number(saved.productId), p.companyId, [
+          { optionType: 'size', label: 'Free Size', accent: null, sortOrder: 0 }
+        ]);
+        const data = await productRepository.fetchBasicInfo(Number(saved.productId), p.companyId);
+        const opt = data?.variants.find(v => v.optionType === 'size' && v.label === 'Free Size');
+        if (opt) {
+          await productRepository.saveInventory(Number(saved.productId), p.companyId, [
+            { optionId: Number(opt.optionId), quantity: p.stock }
+          ]);
+        }
       }
-    });
+    }
 
     if (imageEntries.length > 0) {
       await productRepository.saveBulkProductImages(imageEntries);
     }
-    
-    await Promise.all(basicInfoPromises);
-    await Promise.all(inventoryPromises);
 
     return { imported_count: productsToCreate.length };
   }
