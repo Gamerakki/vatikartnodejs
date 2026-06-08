@@ -132,11 +132,15 @@ export class ProductService {
 
     const imageEntries: { productId: number; productImgPath: string }[] = [];
 
+    console.log(`[BulkImport] Starting DB insertion for ${savedProducts.length} products...`);
+    
     for (let i = 0; i < savedProducts.length; i++) {
       const saved = savedProducts[i];
       const p = productsToCreate[i];
       const imgPath = imageKeyMap.get(p.rowIndex);
       
+      console.log(`[BulkImport] Processing product ${i + 1}/${savedProducts.length}: ID ${saved.productId} - "${p.product}"`);
+
       if (imgPath) {
         imageEntries.push({
           productId: Number(saved.productId),
@@ -174,9 +178,11 @@ export class ProductService {
     }
 
     if (imageEntries.length > 0) {
+      console.log(`[BulkImport] Saving ${imageEntries.length} product images...`);
       await productRepository.saveBulkProductImages(imageEntries);
     }
 
+    console.log(`[BulkImport] Successfully completed importing ${productsToCreate.length} products!`);
     return { imported_count: productsToCreate.length };
   }
 
