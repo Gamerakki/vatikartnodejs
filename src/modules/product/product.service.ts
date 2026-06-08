@@ -76,8 +76,8 @@ export class ProductService {
       const stockStr = colStock > 0 ? row.getCell(colStock).text : '';
       const stock = parseInt(stockStr, 10) || 0;
 
-      // Check if this row has an image
-      const imgBuffer = colImg > 0 ? cellImages.get(`${rowNumber - 1}-${colImg - 1}`) : null;
+      // Check if this row has an image (1-based row and 1-based colImg)
+      const imgBuffer = colImg > 0 ? cellImages.get(`${rowNumber}-${colImg}`) : null;
       
       let imagePromise: Promise<{ rowIndex: number, uploadKey: string | null }>;
 
