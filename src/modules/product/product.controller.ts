@@ -10,6 +10,32 @@ import {
 } from './product.validation';
 
 export class ProductController {
+  async bulkImportProducts(req: Request, res: Response): Promise<void> {
+    const catalogueId = parseInt(req.params.catalogue_id, 10);
+    const loggedInUserId = res.locals.userId || 0;
+    const file = req.file;
+
+    if (isNaN(catalogueId) || !file) {
+      res.status(400).json({ status: false, msg: 'Invalid catalogue_id or missing file' });
+      return;
+    }
+
+    try {
+      const result = await productService.bulkImportProducts(loggedInUserId, catalogueId, file);
+      res.status(200).json({
+        status: true,
+        msg: 'Products imported successfully!',
+        data: result,
+      });
+    } catch (err) {
+      res.status(500).json({
+        status: false,
+        msg: 'An error occurred during import',
+        error: (err as Error).message,
+      });
+    }
+  }
+
   async uploadProductUrlGenerator(req: Request, res: Response): Promise<void> {
     const parseResult = productFileUploadSchema.safeParse(req.body);
 

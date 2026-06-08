@@ -2,6 +2,8 @@ import crypto from 'crypto';
 import path from 'path';
 import { productRepository } from './product.repository';
 import { companyRepository } from '../company/company.repository';
+import ExcelJS from 'exceljs';
+import sharp from 'sharp';
 import {
   ProductFileUploadRequest,
   R2UploadURL,
@@ -16,9 +18,167 @@ import {
   ShopInventoryItemRes,
   ShopInventoryStatsRes,
 } from './product.interface';
-import { generatePresignedUploadURL } from '../../utils/s3';
+import { generatePresignedUploadURL, uploadToR2 } from '../../utils/s3';
 
 export class ProductService {
+  async bulkImportProducts(loggedInUserId: number, catalogueId: number, file: Express.Multer.File): Promise<any> {
+    const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
+    
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(file.buffer);
+    
+    const worksheet = workbook.worksheets[0];
+    if (!worksheet) {
+      throw new Error('No worksheets found in the Excel file.');
+    }
+
+    // Map embedded images to cells
+    const cellImages = new Map<string, any>();
+    for (const image of worksheet.getImages()) {
+      const imgId = image.imageId;
+      const imgData = workbook.model.media.find(m => m.index === imgId);
+      if (imgData && image.range && image.range.tl) {
+        // e.g., row: 1 is 2nd row (0-indexed in exceljs range)
+        const row = Math.floor(image.range.tl.nativeRow) + 1;
+        const col = Math.floor(image.range.tl.nativeCol) + 1;
+        cellImages.set(`${row}-${col}`, imgData.buffer);
+      }
+    }
+
+    // Find headers row (assume row 1)
+    const headerRow = worksheet.getRow(1);
+    const headers: string[] = [];
+    headerRow.eachCell((cell, colNumber) => {
+      headers[colNumber] = cell.text.trim();
+    });
+
+    const colImg = headers.findIndex(h => h === 'Product Image' || h === 'Image');
+    const colName = headers.findIndex(h => h === 'Product Name' || h === 'Title');
+    const colPrice = headers.findIndex(h => h === 'Product Price' || h === 'Price');
+    const colSku = headers.findIndex(h => h === 'Sku' || h === 'SKU');
+    const colStock = headers.findIndex(h => h === 'Available quantity' || h === 'Stock');
+    const colDesc = headers.findIndex(h => h === 'Product Description' || h === 'Description');
+
+    const productsToCreate: any[] = [];
+    const imageUploadPromises: Promise<{ rowIndex: number, uploadKey: string | null }>[] = [];
+
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return; // Skip header
+
+      const name = colName > 0 ? row.getCell(colName).text : '';
+      if (!name) return; // Skip empty rows
+
+      const priceStr = colPrice > 0 ? row.getCell(colPrice).text : '';
+      const price = parseFloat(priceStr) || null;
+      
+      const sku = colSku > 0 ? row.getCell(colSku).text : null;
+      const desc = colDesc > 0 ? row.getCell(colDesc).text : null;
+      const stockStr = colStock > 0 ? row.getCell(colStock).text : '';
+      const stock = parseInt(stockStr, 10) || 0;
+
+      // Check if this row has an image
+      const imgBuffer = colImg > 0 ? cellImages.get(`${rowNumber - 1}-${colImg - 1}`) : null;
+      
+      let imagePromise: Promise<{ rowIndex: number, uploadKey: string | null }>;
+
+      if (imgBuffer) {
+        // Process with sharp and upload
+        imagePromise = sharp(imgBuffer)
+          .jpeg({ quality: 80 })
+          .toBuffer()
+          .then(async (compressedBuffer) => {
+            const fileName = `img_${Date.now()}_${rowNumber}.jpg`;
+            const uploadedName = await uploadToR2('products', compressedBuffer, fileName, 'image/jpeg');
+            return { rowIndex: rowNumber, uploadKey: `products/${uploadedName}` };
+          })
+          .catch(err => {
+            console.error(`Failed to process image at row ${rowNumber}:`, err);
+            return { rowIndex: rowNumber, uploadKey: null };
+          });
+      } else {
+        imagePromise = Promise.resolve({ rowIndex: rowNumber, uploadKey: null });
+      }
+
+      imageUploadPromises.push(imagePromise);
+
+      productsToCreate.push({
+        rowIndex: rowNumber,
+        companyId,
+        catalogueId,
+        product: name,
+        price,
+        sku,
+        description: desc,
+        stock,
+        addedBy: loggedInUserId,
+      });
+    });
+
+    const uploadResults = await Promise.all(imageUploadPromises);
+    const imageKeyMap = new Map<number, string>();
+    for (const res of uploadResults) {
+      if (res.uploadKey) {
+        imageKeyMap.set(res.rowIndex, res.uploadKey);
+      }
+    }
+
+    // Now insert to DB
+    const savedProducts = await productRepository.createProducts(productsToCreate.map(p => ({
+      companyId: p.companyId,
+      catalogueId: p.catalogueId,
+      product: p.product,
+      addedBy: p.addedBy,
+    })));
+
+    const imageEntries: { productId: number; productImgPath: string }[] = [];
+    const basicInfoPromises = [];
+    const inventoryPromises = [];
+
+    savedProducts.forEach((saved, index) => {
+      const p = productsToCreate[index];
+      const imgPath = imageKeyMap.get(p.rowIndex);
+      
+      if (imgPath) {
+        imageEntries.push({
+          productId: Number(saved.productId),
+          productImgPath: imgPath,
+        });
+      }
+
+      basicInfoPromises.push(productRepository.saveBasicInfo({
+        productId: Number(saved.productId),
+        companyId: p.companyId,
+        product: p.product,
+        sku: p.sku || null,
+        description: p.description || null,
+        price: p.price || null,
+        priceMode: 'perPiece',
+        setQuantity: null,
+        meterQuantity: null,
+        setName: null,
+        minimumOrderQty: null,
+        updatedBy: loggedInUserId,
+      }, []));
+
+      if (p.stock > 0) {
+        inventoryPromises.push(productRepository.saveInventory(
+          Number(saved.productId),
+          p.companyId,
+          [{ optionId: null, quantity: p.stock }]
+        ));
+      }
+    });
+
+    if (imageEntries.length > 0) {
+      await productRepository.saveBulkProductImages(imageEntries);
+    }
+    
+    await Promise.all(basicInfoPromises);
+    await Promise.all(inventoryPromises);
+
+    return { imported_count: productsToCreate.length };
+  }
+
   async uploadProductUrlGen(req: ProductFileUploadRequest): Promise<R2UploadURL[]> {
     if (req.files.length === 0 || req.files.length > 20) {
       throw new Error('Upload file count should be less than 20 per upload.');
