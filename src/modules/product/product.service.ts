@@ -25,7 +25,7 @@ export class ProductService {
     const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
     
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(file.buffer);
+    await workbook.xlsx.load(file.buffer as any);
     
     const worksheet = workbook.worksheets[0];
     if (!worksheet) {
@@ -36,7 +36,7 @@ export class ProductService {
     const cellImages = new Map<string, any>();
     for (const image of worksheet.getImages()) {
       const imgId = image.imageId;
-      const imgData = workbook.model.media.find(m => m.index === imgId);
+      const imgData = workbook.model.media.find((m: any) => m.index === imgId);
       if (imgData && image.range && image.range.tl) {
         // e.g., row: 1 is 2nd row (0-indexed in exceljs range)
         const row = Math.floor(image.range.tl.nativeRow) + 1;
@@ -131,8 +131,8 @@ export class ProductService {
     })));
 
     const imageEntries: { productId: number; productImgPath: string }[] = [];
-    const basicInfoPromises = [];
-    const inventoryPromises = [];
+    const basicInfoPromises: Promise<void>[] = [];
+    const inventoryPromises: Promise<void>[] = [];
 
     savedProducts.forEach((saved, index) => {
       const p = productsToCreate[index];
@@ -161,11 +161,19 @@ export class ProductService {
       }, []));
 
       if (p.stock > 0) {
-        inventoryPromises.push(productRepository.saveInventory(
-          Number(saved.productId),
-          p.companyId,
-          [{ optionId: null, quantity: p.stock }]
-        ));
+        inventoryPromises.push(
+          productRepository.saveVariantOptions(Number(saved.productId), p.companyId, [
+            { optionType: 'size', label: 'Free Size', accent: null, sortOrder: 0 }
+          ]).then(async () => {
+             const data = await productRepository.fetchBasicInfo(Number(saved.productId), p.companyId);
+             const opt = data?.variants.find(v => v.optionType === 'size' && v.label === 'Free Size');
+             if (opt) {
+               await productRepository.saveInventory(Number(saved.productId), p.companyId, [
+                 { optionId: Number(opt.optionId), quantity: p.stock }
+               ]);
+             }
+          })
+        );
       }
     });
 
