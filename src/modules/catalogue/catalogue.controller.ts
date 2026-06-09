@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { catalogueService } from './catalogue.service';
 import { saveCatalogueSchema, softDeleteRestoreCatalogueSchema } from './catalogue.validation';
+import { prisma } from '../../config/database';
 
 export class CatalogueController {
   async saveCatalogue(req: Request, res: Response): Promise<void> {
@@ -285,11 +286,21 @@ export class CatalogueController {
   }
 
   async createAccessRequest(req: Request, res: Response): Promise<void> {
-    const catalogueId = parseInt(req.params.catalogue_id, 10);
+    let catalogueId = parseInt(req.params.catalogue_id, 10);
     const { phone, name } = req.body;
 
-    if (isNaN(catalogueId) || !phone || !name) {
-      res.status(400).json({ status: false, msg: `Invalid parameters: id=${req.params.catalogue_id}, name=${name}, phone=${phone}` });
+    if (isNaN(catalogueId)) {
+      // Try to look it up as a slug
+      const cat = await prisma.catalogue.findFirst({ where: { slug: req.params.catalogue_id } });
+      if (!cat) {
+        res.status(404).json({ status: false, msg: `Catalogue not found for slug: ${req.params.catalogue_id}` });
+        return;
+      }
+      catalogueId = Number(cat.catalogueId);
+    }
+
+    if (!phone || !name) {
+      res.status(400).json({ status: false, msg: `Invalid parameters. body=${JSON.stringify(req.body)}` });
       return;
     }
 
