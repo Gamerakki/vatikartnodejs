@@ -11,6 +11,10 @@ export class AdminService {
     return await adminRepository.getCompanyRegistry();
   }
 
+  async getAnalytics(): Promise<any> {
+    return await adminRepository.getMerchantPerformanceAnalytics();
+  }
+
   async renewSubscription(req: RenewSubscriptionReq) {
     const companyIdBig = BigInt(req.company_id);
     const company = await prisma.company.findUnique({

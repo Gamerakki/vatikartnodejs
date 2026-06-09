@@ -32,3 +32,12 @@ export interface RenewSubscriptionReq {
   duration_months: number;
   price_paid: number;
 }
+
+export interface MerchantPerformanceRes {
+  companyId: string;
+  companyName: string;
+  ownerName: string;
+  totalOrders: number;
+  totalGmv: number;
+  averageOrderValue: number;
+}

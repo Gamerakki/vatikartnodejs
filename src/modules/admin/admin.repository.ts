@@ -148,6 +148,53 @@ export class AdminRepository {
       },
     });
   }
+
+  async getMerchantPerformanceAnalytics(): Promise<any[]> {
+    // Group orders by companyId
+    const ordersGrouped = await prisma.order.groupBy({
+      by: ['companyId'],
+      _sum: {
+        total: true,
+      },
+      _count: {
+        orderId: true,
+      },
+      orderBy: {
+        _sum: {
+          total: 'desc',
+        },
+      },
+    });
+
+    const companyIds = ordersGrouped.map((og) => og.companyId);
+
+    // Fetch details for these companies
+    const companies = await prisma.company.findMany({
+      where: {
+        companyId: { in: companyIds },
+      },
+      include: {
+        addedByUser: true,
+      },
+    });
+
+    // Map the grouped data to MerchantPerformanceRes
+    return ordersGrouped.map((og) => {
+      const comp = companies.find((c) => c.companyId === og.companyId);
+      const totalOrders = og._count.orderId;
+      const totalGmv = Number(og._sum.total || 0);
+      const averageOrderValue = totalOrders > 0 ? totalGmv / totalOrders : 0;
+      
+      return {
+        companyId: og.companyId.toString(),
+        companyName: comp?.companyName || 'Unknown',
+        ownerName: comp?.addedByUser ? `${comp.addedByUser.firstName} ${comp.addedByUser.lastName || ''}`.trim() : 'Unknown',
+        totalOrders,
+        totalGmv,
+        averageOrderValue: Number(averageOrderValue.toFixed(2)),
+      };
+    });
+  }
 }
 
 export const adminRepository = new AdminRepository();

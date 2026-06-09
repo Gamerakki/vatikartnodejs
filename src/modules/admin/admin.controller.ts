@@ -37,6 +37,23 @@ export class AdminController {
     }
   }
 
+  async getAnalytics(req: Request, res: Response): Promise<void> {
+    try {
+      const analytics = await adminService.getAnalytics();
+      res.status(200).json({
+        status: true,
+        msg: 'Analytics fetched successfully',
+        data: analytics,
+      });
+    } catch (err) {
+      res.status(500).json({
+        status: false,
+        msg: 'Failed to fetch analytics',
+        error: (err as Error).message,
+      });
+    }
+  }
+
   async renewSubscription(req: Request, res: Response): Promise<void> {
     const parseResult = renewSubscriptionSchema.safeParse(req.body);
 
