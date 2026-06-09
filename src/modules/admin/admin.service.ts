@@ -15,6 +15,10 @@ export class AdminService {
     return await adminRepository.getMerchantPerformanceAnalytics();
   }
 
+  async getStoreInsights(companyId: string): Promise<any> {
+    return await adminRepository.getStoreInsights(companyId);
+  }
+
   async renewSubscription(req: RenewSubscriptionReq) {
     const companyIdBig = BigInt(req.company_id);
     const company = await prisma.company.findUnique({

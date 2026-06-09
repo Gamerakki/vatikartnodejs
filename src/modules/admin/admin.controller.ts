@@ -54,6 +54,29 @@ export class AdminController {
     }
   }
 
+  async getStoreInsights(req: Request, res: Response): Promise<void> {
+    try {
+      const { companyId } = req.params;
+      if (!companyId) {
+        res.status(400).json({ status: false, msg: 'companyId is required' });
+        return;
+      }
+      
+      const insights = await adminService.getStoreInsights(companyId);
+      res.status(200).json({
+        status: true,
+        msg: 'Store insights fetched successfully',
+        data: insights,
+      });
+    } catch (err) {
+      res.status(500).json({
+        status: false,
+        msg: 'Failed to fetch store insights',
+        error: (err as Error).message,
+      });
+    }
+  }
+
   async renewSubscription(req: Request, res: Response): Promise<void> {
     const parseResult = renewSubscriptionSchema.safeParse(req.body);
 

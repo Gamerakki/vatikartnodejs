@@ -195,6 +195,66 @@ export class AdminRepository {
       };
     });
   }
+
+  async getStoreInsights(companyId: string) {
+    const compId = BigInt(companyId);
+
+    // Basic aggregations
+    const ordersAgg = await prisma.order.aggregate({
+      where: { companyId: compId },
+      _count: { orderId: true },
+      _sum: { total: true },
+    });
+
+    const totalOrders = ordersAgg._count.orderId;
+    const totalGmv = Number(ordersAgg._sum.total || 0);
+
+    // Top Products via queryRaw
+    const topProductsRaw: any[] = await prisma.$queryRaw`
+      SELECT 
+        p.product_title as "name",
+        CAST(SUM(oi.qty) AS INTEGER) as "totalQty",
+        SUM(oi.price * oi.qty) as "totalRevenue"
+      FROM order_items oi
+      JOIN orders o ON o.order_id = oi.order_id
+      JOIN products p ON p.product_id = oi.product_id
+      WHERE o.company_id = ${compId}
+      GROUP BY p.product_id, p.product_title
+      ORDER BY "totalQty" DESC
+      LIMIT 10
+    `;
+
+    // Top Catalogues via queryRaw
+    const topCataloguesRaw: any[] = await prisma.$queryRaw`
+      SELECT 
+        c.catalogue_name as "name",
+        CAST(SUM(oi.qty) AS INTEGER) as "totalQty",
+        SUM(oi.price * oi.qty) as "totalRevenue"
+      FROM order_items oi
+      JOIN orders o ON o.order_id = oi.order_id
+      JOIN products p ON p.product_id = oi.product_id
+      JOIN catalogues c ON c.catalogue_id = p.catalogue_id
+      WHERE o.company_id = ${compId}
+      GROUP BY c.catalogue_id, c.catalogue_name
+      ORDER BY "totalQty" DESC
+      LIMIT 5
+    `;
+
+    return {
+      totalOrders,
+      totalGmv,
+      topProducts: topProductsRaw.map((row) => ({
+        name: row.name,
+        totalQty: Number(row.totalQty),
+        totalRevenue: Number(row.totalRevenue || 0),
+      })),
+      topCatalogues: topCataloguesRaw.map((row) => ({
+        name: row.name,
+        totalQty: Number(row.totalQty),
+        totalRevenue: Number(row.totalRevenue || 0),
+      })),
+    };
+  }
 }
 
 export const adminRepository = new AdminRepository();

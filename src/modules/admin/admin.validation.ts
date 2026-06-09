@@ -8,3 +8,7 @@ export const renewSubscriptionSchema = z.object({
   duration_months: z.number().int().positive({ message: 'duration_months must be a positive integer' }),
   price_paid: z.number().nonnegative({ message: 'price_paid must be a non-negative number' }),
 });
+
+export const getStoreInsightsSchema = z.object({
+  companyId: z.string().min(1, { message: 'The param companyId is required' }),
+});
