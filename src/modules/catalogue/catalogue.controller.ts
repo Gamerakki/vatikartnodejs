@@ -287,7 +287,8 @@ export class CatalogueController {
 
   async createAccessRequest(req: Request, res: Response): Promise<void> {
     let catalogueId = parseInt(req.params.catalogue_id, 10);
-    const { phone, name } = req.body;
+    const phone = req.body.phone || req.body.customerPhone;
+    const name = req.body.name || req.body.customerName;
 
     if (isNaN(catalogueId)) {
       // Try to look it up as a slug
