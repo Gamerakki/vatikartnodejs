@@ -227,7 +227,7 @@ export class AdminRepository {
     // Top Catalogues via queryRaw
     const topCataloguesRaw: any[] = await prisma.$queryRaw`
       SELECT 
-        c.catalogue_name as "name",
+        c.catalogue as "name",
         CAST(SUM(oi.qty) AS INTEGER) as "totalQty",
         SUM(oi.price * oi.qty) as "totalRevenue"
       FROM order_items oi
@@ -235,7 +235,7 @@ export class AdminRepository {
       JOIN products p ON p.product_id = oi.product_id
       JOIN catalogues c ON c.catalogue_id = p.catalogue_id
       WHERE o.company_id = ${compId}
-      GROUP BY c.catalogue_id, c.catalogue_name
+      GROUP BY c.catalogue_id, c.catalogue
       ORDER BY "totalQty" DESC
       LIMIT 5
     `;
