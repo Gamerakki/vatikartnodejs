@@ -289,7 +289,7 @@ export class CatalogueController {
     const { phone, name } = req.body;
 
     if (isNaN(catalogueId) || !phone || !name) {
-      res.status(400).json({ status: false, msg: 'Invalid parameters' });
+      res.status(400).json({ status: false, msg: `Invalid parameters: id=${req.params.catalogue_id}, name=${name}, phone=${phone}` });
       return;
     }
 
