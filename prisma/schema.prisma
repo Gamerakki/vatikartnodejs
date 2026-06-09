@@ -99,6 +99,7 @@ model Catalogue {
   isDeleted   Boolean   @default(false) @map("is_deleted")
   slug        String?   @db.VarChar(250)
   isPublished Boolean   @default(false) @map("is_published")
+  privacyLevel String   @default("PUBLIC") @map("privacy_level") @db.VarChar(20) // "PUBLIC", "PRIVATE"
 
   // Relations
   company       Company @relation(fields: [companyId], references: [companyId], onDelete: Cascade, onUpdate: Cascade)
@@ -108,6 +109,7 @@ model Catalogue {
   products Product[]
 
   visitorMappers CatalogueVisitorMapper[]
+  accessRequests CustomerAccessRequest[]
 
   @@map("catalogues")
 }
@@ -260,4 +262,20 @@ model CatalogueVisitorMapper {
   catalogue   Catalogue @relation(fields: [catalogueId], references: [catalogueId], onDelete: Cascade)
 
   @@map("catalogue_visitor_mapper")
+}
+
+model CustomerAccessRequest {
+  accessId      BigInt    @id @default(autoincrement()) @map("access_id")
+  catalogueId   BigInt    @map("catalogue_id")
+  customerPhone String    @map("customer_phone") @db.VarChar(20)
+  customerName  String?   @map("customer_name") @db.VarChar(100)
+  status        String    @default("PENDING") @db.VarChar(20) // PENDING, APPROVED, REJECTED
+  expiresAt     DateTime? @map("expires_at") @db.Timestamptz
+  requestedAt   DateTime  @default(now()) @map("requested_at") @db.Timestamptz
+  updatedAt     DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  catalogue     Catalogue @relation(fields: [catalogueId], references: [catalogueId], onDelete: Cascade)
+
+  @@unique([catalogueId, customerPhone])
+  @@map("customer_access_requests")
 }

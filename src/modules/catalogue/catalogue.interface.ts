@@ -1,6 +1,7 @@
 export interface SaveCatalogueReq {
   catalogue_id?: number;
   catalogue: string;
+  privacy_level?: string;
 }
 
 export interface SaveCatalogueRes {
@@ -18,6 +19,7 @@ export interface CatalogRes {
   total_visitors: number;
   thumbnail_images: string;
   slug: string | null;
+  privacy_level: string;
 }
 
 export interface CatalogueQueryParams {

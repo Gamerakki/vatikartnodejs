@@ -234,31 +234,104 @@ export class CatalogueController {
   async fetchPublicCatalogueProducts(req: Request, res: Response): Promise<void> {
     const idParam = req.params.catalogue_id;
     const catalogueId = parseInt(idParam, 10);
+    const customerPhone = (req.headers['customer-phone'] as string) || null;
 
     try {
       let result;
       if (isNaN(catalogueId)) {
         // Param is a slug!
-        result = await catalogueService.fetchPublicCatalogueProducts(idParam);
+        result = await catalogueService.fetchPublicCatalogueProducts(idParam, customerPhone);
       } else {
         // Param is an ID!
-        result = await catalogueService.fetchPublicCatalogueProducts(catalogueId);
+        result = await catalogueService.fetchPublicCatalogueProducts(catalogueId, customerPhone);
       }
 
       res.status(200).json({
         status: true,
         msg: 'Public catalogue products fetched successfully!',
         title: result.title,
+        privacyLevel: result.privacyLevel,
         data: result.products,
       });
     } catch (err) {
       const msg = (err as Error).message;
-      const status = msg === 'Catalogue not found' ? 404 : 500;
+      let status = 500;
+      if (msg === 'Catalogue not found') status = 404;
+      if (msg === 'REQUIRES_ACCESS') status = 403;
       res.status(status).json({
         status: false,
-        msg: msg === 'Catalogue not found' ? 'Catalogue not found' : 'An error occurred',
+        msg: msg === 'Catalogue not found' ? 'Catalogue not found' : msg === 'REQUIRES_ACCESS' ? 'Private catalogue requires access' : 'An error occurred',
         error: msg,
       });
+    }
+  }
+
+  async updateCataloguePrivacy(req: Request, res: Response): Promise<void> {
+    const loggedInUserId = res.locals.userId || 0;
+    const catalogueId = parseInt(req.params.catalogue_id, 10);
+    const { privacyLevel } = req.body;
+
+    if (isNaN(catalogueId) || !['PUBLIC', 'PRIVATE'].includes(privacyLevel)) {
+      res.status(400).json({ status: false, msg: 'Invalid parameters' });
+      return;
+    }
+
+    try {
+      await catalogueService.updateCataloguePrivacy(loggedInUserId, catalogueId, privacyLevel);
+      res.status(200).json({ status: true, msg: 'Privacy updated successfully' });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async createAccessRequest(req: Request, res: Response): Promise<void> {
+    const catalogueId = parseInt(req.params.catalogue_id, 10);
+    const { phone, name } = req.body;
+
+    if (isNaN(catalogueId) || !phone || !name) {
+      res.status(400).json({ status: false, msg: 'Invalid parameters' });
+      return;
+    }
+
+    try {
+      await catalogueService.createAccessRequest(catalogueId, phone, name);
+      res.status(200).json({ status: true, msg: 'Request submitted successfully' });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async fetchAccessRequests(req: Request, res: Response): Promise<void> {
+    const loggedInUserId = res.locals.userId || 0;
+    try {
+      const requests = await catalogueService.fetchAccessRequests(loggedInUserId);
+      res.status(200).json({ status: true, data: requests });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async updateAccessRequest(req: Request, res: Response): Promise<void> {
+    const loggedInUserId = res.locals.userId || 0;
+    const accessId = parseInt(req.params.access_id, 10);
+    const { status, expiresInHours } = req.body;
+
+    if (isNaN(accessId) || !['APPROVED', 'REJECTED'].includes(status)) {
+      res.status(400).json({ status: false, msg: 'Invalid parameters' });
+      return;
+    }
+
+    let expiresAt: Date | null = null;
+    if (status === 'APPROVED' && expiresInHours) {
+      expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + expiresInHours);
+    }
+
+    try {
+      await catalogueService.updateAccessRequest(loggedInUserId, accessId, status, expiresAt);
+      res.status(200).json({ status: true, msg: `Request ${status.toLowerCase()} successfully` });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
     }
   }
 }

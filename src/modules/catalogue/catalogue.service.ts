@@ -112,7 +112,7 @@ export class CatalogueService {
     return await catalogueRepository.fetchRestoredCataloguesDataViaCatalogueIds(catalogueIds);
   }
 
-  async fetchPublicCatalogueProducts(idOrSlug: number | string) {
+  async fetchPublicCatalogueProducts(idOrSlug: number | string, customerPhone: string | null) {
     let catalogue;
     let targetId = 0;
 
@@ -129,11 +129,42 @@ export class CatalogueService {
     if (!catalogue) {
       throw new Error('Catalogue not found');
     }
+
+    if (catalogue.privacyLevel === 'PRIVATE') {
+      if (!customerPhone) {
+        throw new Error('REQUIRES_ACCESS');
+      }
+      const hasAccess = await catalogueRepository.hasCustomerAccess(targetId, customerPhone);
+      if (!hasAccess) {
+        throw new Error('REQUIRES_ACCESS');
+      }
+    }
+
     const products = await productRepository.fetchProductsByCatalogue(targetId, catalogue.companyId);
     return {
       title: catalogue.title,
+      privacyLevel: catalogue.privacyLevel,
       products,
     };
+  }
+
+  async createAccessRequest(catalogueId: number, phone: string, name: string): Promise<void> {
+    await catalogueRepository.createAccessRequest(catalogueId, phone, name);
+  }
+
+  async fetchAccessRequests(loggedInUserId: number): Promise<any[]> {
+    const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
+    return await catalogueRepository.fetchAccessRequests(companyId);
+  }
+
+  async updateAccessRequest(loggedInUserId: number, accessId: number, status: string, expiresAt: Date | null): Promise<void> {
+    const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
+    await catalogueRepository.updateAccessRequest(accessId, companyId, status, expiresAt);
+  }
+
+  async updateCataloguePrivacy(loggedInUserId: number, catalogueId: number, privacyLevel: string): Promise<void> {
+    const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
+    await catalogueRepository.updateCataloguePrivacy(catalogueId, companyId, privacyLevel);
   }
 }
 

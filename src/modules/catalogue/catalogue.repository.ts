@@ -10,6 +10,7 @@ export class CatalogueRepository {
     addedBy?: number;
     updatedBy?: number;
     slug?: string;
+    privacyLevel?: string;
   }): Promise<{ catalogueId: number; slug: string; addedDate: Date }> {
     const now = new Date();
 
@@ -22,6 +23,7 @@ export class CatalogueRepository {
           slug: data.slug || null,
           isPublished: true,
           addedDate: now,
+          privacyLevel: data.privacyLevel || 'PUBLIC',
         },
       });
 
@@ -39,6 +41,7 @@ export class CatalogueRepository {
         updatedBy: BigInt(data.updatedBy || 0),
         isPublished: true,
         updatedDate: now,
+        ...(data.privacyLevel ? { privacyLevel: data.privacyLevel } : {}),
       },
     });
 
@@ -79,6 +82,7 @@ export class CatalogueRepository {
           c.added_date,
           c.is_published, 
           c.slug,
+          c.privacy_level,
           COALESCE(p.total_products_count, 0) as total_products_count,
           COALESCE(pi.thumbnail_images, '') as thumbnail_images,
           COALESCE(cvm.total_visitors, 0) as total_visitors
@@ -117,7 +121,7 @@ export class CatalogueRepository {
         WHERE c.is_deleted = ${isDeleted}
           AND c.company_id = ${companyIdBig}
           AND c.catalogue ILIKE ${'%' + params.search_txt + '%'}
-        GROUP BY c.catalogue_id, c.slug, cvm.total_visitors, p.total_products_count, pi.thumbnail_images
+        GROUP BY c.catalogue_id, c.slug, c.privacy_level, cvm.total_visitors, p.total_products_count, pi.thumbnail_images
         ORDER BY c.catalogue_id DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
@@ -129,6 +133,7 @@ export class CatalogueRepository {
           c.added_date,
           c.is_published, 
           c.slug,
+          c.privacy_level,
           COALESCE(p.total_products_count, 0) as total_products_count,
           COALESCE(pi.thumbnail_images, '') as thumbnail_images,
           COALESCE(cvm.total_visitors, 0) as total_visitors
@@ -166,7 +171,7 @@ export class CatalogueRepository {
         ) cvm on cvm.catalogue_id = c.catalogue_id
         WHERE c.is_deleted = ${isDeleted}
           AND c.company_id = ${companyIdBig}
-        GROUP BY c.catalogue_id, c.slug, cvm.total_visitors, p.total_products_count, pi.thumbnail_images
+        GROUP BY c.catalogue_id, c.slug, c.privacy_level, cvm.total_visitors, p.total_products_count, pi.thumbnail_images
         ORDER BY c.catalogue_id DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
@@ -181,6 +186,7 @@ export class CatalogueRepository {
       total_visitors: Number(row.total_visitors),
       thumbnail_images: row.thumbnail_images || '',
       slug: row.slug || null,
+      privacy_level: row.privacy_level || 'PUBLIC',
     }));
   }
 
@@ -229,6 +235,7 @@ export class CatalogueRepository {
       total_visitors: 0,
       thumbnail_images: '',
       slug: catalogue.slug || null,
+      privacy_level: catalogue.privacyLevel,
     };
   }
 
@@ -293,10 +300,11 @@ export class CatalogueRepository {
       total_visitors: 0,
       thumbnail_images: '',
       slug: c.slug || null,
+      privacy_level: c.privacyLevel,
     }));
   }
 
-  async fetchPublicCatalogueData(catalogueId: number): Promise<{ catalogueId: number; companyId: number; title: string } | null> {
+  async fetchPublicCatalogueData(catalogueId: number): Promise<{ catalogueId: number; companyId: number; title: string; privacyLevel: string } | null> {
     const catalogue = await prisma.catalogue.findFirst({
       where: {
         catalogueId: BigInt(catalogueId),
@@ -311,10 +319,11 @@ export class CatalogueRepository {
       catalogueId: Number(catalogue.catalogueId),
       companyId: Number(catalogue.companyId),
       title: catalogue.catalogue || '',
+      privacyLevel: catalogue.privacyLevel,
     };
   }
 
-  async fetchPublicCatalogueDataBySlug(slug: string): Promise<{ catalogueId: number; companyId: number; title: string } | null> {
+  async fetchPublicCatalogueDataBySlug(slug: string): Promise<{ catalogueId: number; companyId: number; title: string; privacyLevel: string } | null> {
     const catalogue = await prisma.catalogue.findFirst({
       where: {
         slug: slug,
@@ -329,7 +338,112 @@ export class CatalogueRepository {
       catalogueId: Number(catalogue.catalogueId),
       companyId: Number(catalogue.companyId),
       title: catalogue.catalogue || '',
+      privacyLevel: catalogue.privacyLevel,
     };
+  }
+
+  async hasCustomerAccess(catalogueId: number, phone: string): Promise<boolean> {
+    const access = await prisma.customerAccessRequest.findFirst({
+      where: {
+        catalogueId: BigInt(catalogueId),
+        customerPhone: phone,
+        status: 'APPROVED',
+      }
+    });
+    
+    if (!access) return false;
+    if (access.expiresAt && new Date() > access.expiresAt) return false;
+    
+    return true;
+  }
+
+  async createAccessRequest(catalogueId: number, phone: string, name: string): Promise<void> {
+    await prisma.customerAccessRequest.upsert({
+      where: {
+        catalogueId_customerPhone: {
+          catalogueId: BigInt(catalogueId),
+          customerPhone: phone,
+        }
+      },
+      update: {
+        customerName: name,
+        status: 'PENDING',
+        requestedAt: new Date(),
+      },
+      create: {
+        catalogueId: BigInt(catalogueId),
+        customerPhone: phone,
+        customerName: name,
+        status: 'PENDING',
+      }
+    });
+  }
+
+  async fetchAccessRequests(companyId: number): Promise<any[]> {
+    const requests = await prisma.customerAccessRequest.findMany({
+      where: {
+        catalogue: {
+          companyId: BigInt(companyId),
+        }
+      },
+      include: {
+        catalogue: {
+          select: {
+            catalogue: true,
+          }
+        }
+      },
+      orderBy: {
+        requestedAt: 'desc'
+      }
+    });
+
+    return requests.map(r => ({
+      accessId: Number(r.accessId),
+      catalogueId: Number(r.catalogueId),
+      catalogueName: r.catalogue.catalogue,
+      customerPhone: r.customerPhone,
+      customerName: r.customerName,
+      status: r.status,
+      expiresAt: r.expiresAt,
+      requestedAt: r.requestedAt,
+    }));
+  }
+
+  async updateAccessRequest(accessId: number, companyId: number, status: string, expiresAt: Date | null): Promise<void> {
+    // First verify this access request belongs to a catalogue owned by this company
+    const req = await prisma.customerAccessRequest.findFirst({
+      where: {
+        accessId: BigInt(accessId),
+        catalogue: {
+          companyId: BigInt(companyId)
+        }
+      }
+    });
+
+    if (!req) {
+      throw new Error('Access request not found or unauthorized');
+    }
+
+    await prisma.customerAccessRequest.update({
+      where: { accessId: BigInt(accessId) },
+      data: {
+        status,
+        expiresAt,
+      }
+    });
+  }
+
+  async updateCataloguePrivacy(catalogueId: number, companyId: number, privacyLevel: string): Promise<void> {
+    const exists = await prisma.catalogue.findFirst({
+      where: { catalogueId: BigInt(catalogueId), companyId: BigInt(companyId) }
+    });
+    if (!exists) throw new Error('Catalogue not found');
+
+    await prisma.catalogue.update({
+      where: { catalogueId: BigInt(catalogueId) },
+      data: { privacyLevel }
+    });
   }
 }
 
