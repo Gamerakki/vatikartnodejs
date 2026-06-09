@@ -4,7 +4,7 @@
 
 # 🚀 VatiKart — Backend API
 
-The core RESTful API server powering the entire VatiKart platform. Built with **Express.js**, **TypeScript**, and **Prisma ORM** on **PostgreSQL**.
+The core RESTful API server powering the entire VatiKart platform. Originally migrated from Go, now built with **Express.js**, **TypeScript**, and **Prisma ORM** on **PostgreSQL**.
 
 ---
 
@@ -13,10 +13,10 @@ The core RESTful API server powering the entire VatiKart platform. Built with **
 - [Tech Stack](#-tech-stack)
 - [Architecture](#-architecture)
 - [Database Models](#-database-models)
-- [API Modules](#-api-modules)
 - [API Endpoints](#-api-endpoints)
 - [Getting Started](#-getting-started)
 - [Environment Variables](#-environment-variables)
+- [Deployment](#-deployment)
 - [Scripts](#-scripts)
 
 ---
@@ -32,7 +32,13 @@ The core RESTful API server powering the entire VatiKart platform. Built with **
 | **Zod** | Request Validation |
 | **JWT (jsonwebtoken)** | Authentication |
 | **bcryptjs** | Password Hashing |
-| **Multer + Cloudinary** | Image Uploads |
+| **Cloudflare R2 / AWS S3** | Image & File Storage |
+| **Sharp** | Image Processing |
+| **Multer** | File Upload Handling |
+| **Redis (ioredis)** | Caching Layer |
+| **Pino** | Structured Logging |
+| **ExcelJS** | Excel Bulk Import |
+| **Brevo (Sendinblue)** | Transactional Emails |
 | **CORS** | Cross-Origin Requests |
 
 ---
@@ -41,138 +47,130 @@ The core RESTful API server powering the entire VatiKart platform. Built with **
 
 ```
 src/
-├── app.ts                    # Express app setup, middleware, route mounting
-├── server.ts                 # HTTP server entry point
+├── app.ts                        # Express app setup, middleware, route mounting
+├── server.ts                     # HTTP server, graceful shutdown, self-ping
+├── seedAdmin.ts                  # Seeds default admin user
 ├── config/
-│   └── database.ts           # Prisma client singleton
+│   ├── database.ts               # Prisma client singleton
+│   ├── redis.ts                  # Redis client with graceful fallback
+│   ├── jwt.ts                    # JWT generation & validation (HS256)
+│   └── logger.ts                 # Pino structured logger
 ├── middlewares/
-│   └── auth.ts               # JWT authentication guard
+│   ├── auth.ts                   # validateAuth, validateNoAuth, validateOptionalAuth
+│   └── userActivity.ts           # Tracks user last active time
 ├── modules/
-│   ├── admin/                # Super Admin analytics & subscription management
-│   ├── auth/                 # Login, Register, JWT token generation
-│   ├── catalogue/            # Catalogue CRUD, privacy settings, access control
-│   ├── company/              # Company/Store profile management
-│   ├── order/                # Order lifecycle (create, status, discount, shipping)
-│   └── product/              # Product CRUD, images, variants, bulk discounts
+│   ├── admin/                    # Platform analytics & subscription management
+│   ├── user/                     # Registration, login, JWT token generation
+│   ├── company/                  # Store profile, logo, social media, contacts
+│   ├── catalogue/                # Catalogue CRUD, privacy, access control
+│   ├── product/                  # Product CRUD, images, variants, bulk import
+│   ├── order/                    # Order lifecycle (book, status, discount, shipping)
+│   └── social_media_master/      # Social media platform lookup
 └── utils/
-    └── cloudinary.ts         # Cloudinary upload helper
+    ├── s3.ts                     # Cloudflare R2 upload/delete/presigned URLs
+    ├── mailer.ts                 # Brevo transactional email
+    └── common.ts                 # Timezone, random tokens, sanitization
 ```
 
-Each module follows a clean layered architecture:
+Each module follows a clean **layered architecture**:
 ```
 module/
-├── module.router.ts          # Route definitions
-├── module.controller.ts      # Request handling & response
-├── module.service.ts         # Business logic
-├── module.repository.ts      # Database queries (Prisma)
-├── module.validation.ts      # Zod schemas
-└── module.interface.ts       # TypeScript interfaces
+├── module.router.ts              # Route definitions
+├── module.controller.ts          # Request handling & response
+├── module.service.ts             # Business logic
+├── module.repository.ts          # Database queries (Prisma)
+├── module.validation.ts          # Zod schemas
+└── module.interface.ts           # TypeScript interfaces
 ```
 
 ---
 
-## 🗄 Database Models
+## 🗄 Database Models (15 Total)
 
-| Model | Description |
-|---|---|
-| **User** | Registered store owners (auth, profile) |
-| **Company** | Business/Store entity linked to a user |
-| **Catalogue** | Product catalogues with privacy levels (PUBLIC/PRIVATE) |
-| **Product** | Items within catalogues (price, SKU, description) |
-| **ProductImage** | Multiple images per product |
-| **ProductBulkDiscountSlab** | Tiered quantity-based pricing |
-| **ProductVariantOption** | Size/color variants |
-| **ProductVariantInventory** | Stock per variant |
-| **Order** | Customer orders with status lifecycle |
-| **OrderItem** | Line items within an order |
-| **Subscription** | Plan tier & validity per company |
-| **CatalogueVisitorMapper** | Tracks visitors to catalogues |
-| **CustomerAccessRequest** | Access requests for private catalogues |
-
----
-
-## 📦 API Modules
-
-### 🔐 Auth (`/auth`)
-- User registration with unique username validation
-- Secure login with bcrypt password verification
-- JWT token generation for session management
-
-### 🏢 Company (`/company`)
-- Company profile management
-- Linked to authenticated user
-
-### 📒 Catalogue (`/catalogue`)
-- Full CRUD for catalogues
-- Privacy level support: **PUBLIC** and **PRIVATE**
-- Customer access request & approval system
-- Slug-based public catalogue lookup
-
-### 📦 Product (`/product`)
-- Full CRUD for products within catalogues
-- Multi-image uploads via Cloudinary
-- Bulk discount slabs (tiered pricing)
-- Size/Color variant options with inventory tracking
-- Reorder level & max stock configuration
-
-### 🛒 Order (`/order`)
-- Order booking with line items
-- Status lifecycle: `UNCONFIRMED → CONFIRMED → ACCEPTED → COMPLETED / REJECTED`
-- Discount and shipping charge adjustments
-- Customer-side item deletion
-
-### 📊 Admin (`/admin`)
-- Platform-wide dashboard statistics
-- Company registry with subscription details
-- Merchant performance analytics (GMV, orders, AOV)
-- **Store-level deep insights** (top products, top catalogues)
-- Subscription renewal & plan upgrades
+| Model | Table | Description |
+|---|---|---|
+| **User** | `users` | Store owners (auth, profile, isAdmin flag) |
+| **Company** | `company` | Business entity with logo, address, contacts |
+| **CompanySocialMediaMapper** | `company_social_media_mapper` | Social media links per company |
+| **SocialMediaMaster** | `social_media_master` | Platform lookup (Instagram, Facebook, etc.) |
+| **Catalogue** | `catalogues` | Product catalogues with privacy (PUBLIC/PRIVATE) |
+| **Product** | `products` | Items with price modes, SKU, min order qty |
+| **ProductImage** | `product_images` | Multiple images per product |
+| **ProductBulkDiscountSlab** | `product_bulk_discount_slabs` | Tiered quantity-based pricing |
+| **ProductVariantOption** | `product_variant_options` | Size/Color variant options |
+| **ProductVariantInventory** | `product_variant_inventories` | Stock per variant |
+| **Order** | `orders` | Customer orders with status lifecycle |
+| **OrderItem** | `order_items` | Line items within an order |
+| **Subscription** | `subscriptions` | Plan tier & validity per company |
+| **CatalogueVisitorMapper** | `catalogue_visitor_mapper` | Tracks catalogue visitors |
+| **CustomerAccessRequest** | `customer_access_requests` | Access requests for private catalogues |
 
 ---
 
 ## 🌐 API Endpoints
 
-### Auth
+### 👤 User (`/user`)
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `POST` | `/user/register` | No Auth | Register new user & company |
+| `POST` | `/user/login` | No Auth | Login & receive JWT |
+| `GET` | `/user/check-duplicate-username` | Optional | Check username availability |
+| `GET` | `/user/check-email-address` | Optional | Check email availability |
+| `GET` | `/user/validate-token` | Required | Validate JWT token |
+
+### 🏢 Company (`/company`) — All Require Auth
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/auth/register` | Register new user & company |
-| `POST` | `/auth/login` | Login & receive JWT |
-| `GET` | `/auth/check-username/:username` | Check username availability |
+| `POST` | `/company/save` | Create/update company (multipart, logo upload) |
+| `GET` | `/company/fetch-data` | Fetch company profile |
+| `POST` | `/company/save-social-media` | Save social media links |
+| `PATCH` | `/company/save-support-contact-details` | Update support contact |
+| `GET` | `/company/fetch-support-contact-details` | Get support contact |
+| `PATCH` | `/company/save-sales-contact-details` | Update sales contact |
+| `GET` | `/company/fetch-sales-contact-details` | Get sales contact |
 
-### Catalogue
+### 📒 Catalogue (`/catalogue`)
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `GET` | `/catalogue/public/:id/products` | Public | Fetch public catalogue products |
+| `POST` | `/catalogue/public/:id/request-access` | Public | Request access to private catalogue |
+| `POST` | `/catalogue/save` | Required | Create/update catalogue |
+| `GET` | `/catalogue/fetch-list` | Required | Fetch all catalogues |
+| `GET` | `/catalogue/fetch-data/:id` | Required | Fetch single catalogue |
+| `DELETE` | `/catalogue/delete` | Required | Soft-delete catalogue |
+| `PATCH` | `/catalogue/privacy/:id` | Required | Set PUBLIC/PRIVATE |
+| `GET` | `/catalogue/access-requests` | Required | View pending access requests |
+| `PATCH` | `/catalogue/access-request/:id` | Required | Approve/Reject access |
+| `GET` | `/catalogue/fetch-deleted-list` | Required | View deleted catalogues |
+| `PATCH` | `/catalogue/restore` | Required | Restore deleted catalogue |
+
+### 📦 Product (`/product`) — All Require Auth
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/catalogue/fetch` | Fetch all catalogues for logged-in user |
-| `POST` | `/catalogue/add` | Create a new catalogue |
-| `PUT` | `/catalogue/update` | Update catalogue details |
-| `DELETE` | `/catalogue/delete/:id` | Soft-delete a catalogue |
-| `PUT` | `/catalogue/update-privacy` | Set PUBLIC/PRIVATE |
-| `GET` | `/catalogue/public/:slug` | Public catalogue lookup |
-| `POST` | `/catalogue/request-access` | Request access to private catalogue |
-| `GET` | `/catalogue/access-requests` | View pending access requests |
-| `PUT` | `/catalogue/handle-access-request` | Approve/Reject access |
+| `POST` | `/product/create` | Create a product |
+| `GET` | `/product/fetch-list/:catalogue_id` | Fetch products in a catalogue |
+| `PATCH` | `/product/save-basic-info` | Update product details |
+| `GET` | `/product/fetch-basic-info/:product_id` | Get product details |
+| `POST` | `/product/gen-product-img-upload-url` | Generate presigned upload URL |
+| `PATCH` | `/product/save-variant-options` | Save size/color variants |
+| `PATCH` | `/product/save-inventory` | Update variant inventory |
+| `GET` | `/product/fetch-inventory/:product_id` | Get product inventory |
+| `GET` | `/product/inventory/list` | Inventory listing |
+| `GET` | `/product/inventory/stats` | Inventory statistics |
+| `PATCH` | `/product/inventory/restock` | Restock inventory |
+| `POST` | `/product/bulk-import/:catalogue_id` | Bulk import via Excel |
 
-### Product
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/product/fetch/:catalogueId` | Fetch products in a catalogue |
-| `POST` | `/product/add` | Add a product |
-| `PUT` | `/product/update` | Update product details |
-| `DELETE` | `/product/delete/:id` | Soft-delete a product |
-| `POST` | `/product/upload-images` | Upload product images |
-| `DELETE` | `/product/delete-image/:id` | Delete a product image |
+### 🛒 Order (`/order`)
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `POST` | `/order/public/book` | Public | Book a new order |
+| `GET` | `/order/fetch-list` | Required | Fetch all orders |
+| `GET` | `/order/fetch-data/:order_id` | Required | Fetch order details |
+| `PATCH` | `/order/update-status` | Required | Update order status |
+| `PATCH` | `/order/update-discount` | Required | Apply discount |
+| `PATCH` | `/order/update-shipping` | Required | Set shipping charge |
 
-### Order
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/order/fetch` | Fetch all orders |
-| `GET` | `/order/fetch/:order_id` | Fetch order details |
-| `PUT` | `/order/update-status` | Update order status |
-| `PUT` | `/order/update-discount` | Apply discount |
-| `PUT` | `/order/update-shipping` | Set shipping charge |
-| `POST` | `/order/book` | Book a new order |
-
-### Admin
+### 📊 Admin (`/admin`) — All Require Auth
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/admin/dashboard-stats` | Platform KPI metrics |
@@ -181,6 +179,12 @@ module/
 | `GET` | `/admin/store-insights/:companyId` | Deep store-level analytics |
 | `POST` | `/admin/renew-subscription` | Renew/upgrade subscription |
 
+### 🔗 Social Media Master (`/master`) — All Require Auth
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/master/fetch-social-medias` | Fetch all platforms |
+| `GET` | `/master/fetch-company-social-medias` | Fetch company's social links |
+
 ---
 
 ## 🚀 Getting Started
@@ -188,7 +192,8 @@ module/
 ### Prerequisites
 - Node.js ≥ 18
 - PostgreSQL database
-- Cloudinary account (for image uploads)
+- Cloudflare R2 or AWS S3 bucket (for file storage)
+- Redis (optional, for caching)
 
 ### Installation
 
@@ -202,30 +207,56 @@ npm install
 
 # Set up environment variables
 cp .env.example .env
-# Edit .env with your database URL, JWT secret, Cloudinary keys
+# Edit .env with your database URL, JWT secret, R2/S3 keys
+
+# Generate Prisma client
+npx prisma generate
 
 # Run Prisma migrations
 npx prisma migrate dev
 
-# Generate Prisma client
-npx prisma generate
+# Seed admin user (optional)
+npx ts-node src/seedAdmin.ts
 
 # Start development server
 npm run dev
 ```
 
+The server starts at `http://localhost:8080`.
+
 ---
 
 ## 🔑 Environment Variables
 
-| Variable | Description |
-|---|---|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `JWT_SECRET` | Secret key for JWT signing |
-| `PORT` | Server port (default: 3000) |
-| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name |
-| `CLOUDINARY_API_KEY` | Cloudinary API key |
-| `CLOUDINARY_API_SECRET` | Cloudinary API secret |
+| Category | Variable | Description |
+|---|---|---|
+| **Server** | `PORT` | Server port (default: 8080) |
+| **Server** | `NODE_ENV` | Environment (development/production) |
+| **Database** | `DATABASE_URL` | PostgreSQL connection string |
+| **Auth** | `JWT_SECRET` | Secret key for JWT signing |
+| **Auth** | `TOKEN_HOUR_LIFESPAN` | JWT expiry in hours (default: 1) |
+| **Redis** | `REDIS_ADDR` | Redis connection URL |
+| **Storage** | `BUCKET` | R2/S3 bucket name |
+| **Storage** | `ACCESS_KEY_ID` | R2/S3 access key |
+| **Storage** | `SECRET_ACCESS_KEY` | R2/S3 secret key |
+| **Storage** | `S3_ENDPOINT` | R2/S3 endpoint URL |
+| **Storage** | `PUBLIC_BUCKET_URL` | CDN URL for public assets |
+| **Email** | `BREVO_API_KEY` | Brevo transactional email API key |
+| **CORS** | `ALLOWED_ORIGINS` | Comma-separated allowed origins |
+
+---
+
+## 🚢 Deployment
+
+### Render (Production)
+The project includes a `render.yaml` for one-click deployment on Render:
+- **Build**: `npm install --include=dev && npx prisma generate && npm run build`
+- **Start**: `npm start`
+- **Self-ping**: The server pings itself every 14 minutes at `/robots.txt` to prevent Render free tier from sleeping
+
+### Custom Domain
+- API: `https://api.vatikart.in`
+- CDN: `https://cdn.vatikart.in` (Cloudflare R2)
 
 ---
 
@@ -233,9 +264,11 @@ npm run dev
 
 | Script | Command | Description |
 |---|---|---|
-| `dev` | `npm run dev` | Start dev server with ts-node |
-| `build` | `npm run build` | Compile TypeScript |
+| `dev` | `npm run dev` | Start dev server with ts-node-dev (hot reload) |
+| `build` | `npm run build` | Compile TypeScript to `dist/` |
 | `start` | `npm start` | Run compiled JS (production) |
+| `prisma:generate` | `npx prisma generate` | Generate Prisma client |
+| `prisma:studio` | `npx prisma studio` | Open Prisma Studio GUI |
 
 ---
 
