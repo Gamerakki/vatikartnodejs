@@ -16,7 +16,8 @@ const app = express();
 // Set up CORS configurations mirroring the Go backend
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',');
 const allowedMethods = (process.env.ALLOWED_METHODS || 'GET,POST,PUT,DELETE,OPTIONS,PATCH').split(',');
-const allowedHeaders = (process.env.ALLOWED_HEADERS || 'Content-Type,Authorization,customer-phone').split(',');
+const envHeaders = process.env.ALLOWED_HEADERS || 'Content-Type,Authorization';
+const allowedHeaders = `${envHeaders},customer-phone`.split(',');
 const exposedHeaders = (process.env.EXPOSE_HEADERS || 'Content-Length,Authorization').split(',');
 const allowCredentials = process.env.ALLOW_CREDENTIALS !== 'false';
 
