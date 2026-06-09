@@ -57,6 +57,17 @@ async function bootstrap() {
     }, 10000);
   };
 
+  // Self-ping to prevent Render from sleeping (every 14 minutes)
+  const PING_INTERVAL = 14 * 60 * 1000;
+  const selfUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${port}`;
+  
+  setInterval(() => {
+    logger.info(`Self-pinging ${selfUrl}/robots.txt to keep server awake...`);
+    fetch(`${selfUrl}/robots.txt`)
+      .then(res => logger.info(`Self-ping status: ${res.status}`))
+      .catch(err => logger.error(`Self-ping failed`, err));
+  }, PING_INTERVAL);
+
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
