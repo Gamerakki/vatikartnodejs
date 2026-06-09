@@ -212,14 +212,14 @@ export class AdminRepository {
     // Top Products via queryRaw
     const topProductsRaw: any[] = await prisma.$queryRaw`
       SELECT 
-        p.product_title as "name",
+        p.product as "name",
         CAST(SUM(oi.qty) AS INTEGER) as "totalQty",
         SUM(oi.price * oi.qty) as "totalRevenue"
       FROM order_items oi
       JOIN orders o ON o.order_id = oi.order_id
       JOIN products p ON p.product_id = oi.product_id
       WHERE o.company_id = ${compId}
-      GROUP BY p.product_id, p.product_title
+      GROUP BY p.product_id, p.product
       ORDER BY "totalQty" DESC
       LIMIT 10
     `;
