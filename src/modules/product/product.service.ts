@@ -251,6 +251,13 @@ export class ProductService {
     return await productRepository.fetchProductsByCatalogue(catalogueId, companyId);
   }
 
+  async fetchAllProducts(
+    loggedInUserId: number
+  ): Promise<ProductListItemRes[]> {
+    const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
+    return await productRepository.fetchAllProducts(companyId);
+  }
+
   async saveBasicInfo(loggedInUserId: number, req: SaveBasicInfoReq): Promise<void> {
     const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
 

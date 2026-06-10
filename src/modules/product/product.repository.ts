@@ -92,6 +92,71 @@ export class ProductRepository {
           discount_percent: d.discountPercent ? Number(d.discountPercent) : null,
           sort_order: d.sortOrder,
         })),
+        catalogue_id: Number(p.catalogueId),
+      };
+    });
+  }
+
+  async fetchAllProducts(
+    companyId: number
+  ): Promise<ProductListItemRes[]> {
+    const products = await prisma.product.findMany({
+      where: {
+        companyId: BigInt(companyId),
+        isDeleted: false,
+      },
+      include: {
+        images: {
+          orderBy: { productImgId: 'asc' },
+        },
+        variantOptions: {
+          include: {
+            inventories: true,
+          },
+          orderBy: [{ sortOrder: 'asc' }, { optionId: 'asc' }],
+        },
+        bulkDiscounts: {
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+      orderBy: { productId: 'desc' },
+    });
+
+    return products.map((p) => {
+      const sizesOptions = p.variantOptions.filter((o) => o.optionType === 'size');
+      const colorsOptions = p.variantOptions.filter((o) => o.optionType === 'color');
+
+      let totalStock = 0;
+      sizesOptions.forEach((o) => {
+        const qty = o.inventories.reduce((sum, inv) => sum + inv.quantity, 0);
+        totalStock += qty;
+      });
+
+      return {
+        product_id: Number(p.productId),
+        product: p.product,
+        sku: p.sku,
+        price: p.price ? Number(p.price) : null,
+        img_path: p.images[0]?.productImgPath || null,
+        images: p.images.map((img: any) => img.productImgPath),
+        slug: p.slug,
+        total_stock: totalStock,
+        size_count: sizesOptions.length,
+        description: p.description,
+        sizes: sizesOptions.map((o) => o.label),
+        colors: colorsOptions.map((o) => ({
+          name: o.label,
+          hex: o.accent,
+        })),
+        bulk_discounts: p.bulkDiscounts.map((d) => ({
+          slab_id: Number(d.slabId),
+          min_qty: d.minQty,
+          max_qty: d.maxQty,
+          discounted_price: d.discountedPrice ? Number(d.discountedPrice) : null,
+          discount_percent: d.discountPercent ? Number(d.discountPercent) : null,
+          sort_order: d.sortOrder,
+        })),
+        catalogue_id: Number(p.catalogueId),
       };
     });
   }

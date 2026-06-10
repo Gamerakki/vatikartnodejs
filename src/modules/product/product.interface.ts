@@ -43,6 +43,7 @@ export interface ProductListItemRes {
   sizes?: string[];
   colors?: { name: string; hex: string | null }[];
   bulk_discounts?: BulkDiscountSlabRes[];
+  catalogue_id?: number;
 }
 
 export interface BulkDiscountSlabReq {

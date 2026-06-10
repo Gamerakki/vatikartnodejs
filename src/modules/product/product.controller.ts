@@ -131,6 +131,25 @@ export class ProductController {
     }
   }
 
+  async fetchAllProducts(req: Request, res: Response): Promise<void> {
+    const loggedInUserId = res.locals.userId || 0;
+
+    try {
+      const list = await productService.fetchAllProducts(loggedInUserId);
+      res.status(200).json({
+        status: true,
+        msg: 'All products fetched successfully!',
+        data: list,
+      });
+    } catch (err) {
+      res.status(500).json({
+        status: false,
+        msg: 'An error occurred',
+        error: (err as Error).message,
+      });
+    }
+  }
+
   async saveBasicInfo(req: Request, res: Response): Promise<void> {
     const parseResult = saveBasicInfoSchema.safeParse(req.body);
 
