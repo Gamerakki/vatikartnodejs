@@ -346,6 +346,44 @@ export class CatalogueController {
       res.status(500).json({ status: false, msg: (err as Error).message });
     }
   }
+
+  async cloneCatalogue(req: Request, res: Response): Promise<void> {
+    const loggedInUserId = res.locals.userId || 0;
+    const catalogueId = parseInt(req.params.catalogue_id, 10);
+    const { catalogue } = req.body;
+
+    if (isNaN(catalogueId)) {
+      res.status(400).json({ status: false, msg: 'Invalid catalogue_id' });
+      return;
+    }
+
+    if (!catalogue || !catalogue.trim()) {
+      res.status(400).json({ status: false, msg: 'Catalogue name is required' });
+      return;
+    }
+
+    try {
+      const cloned = await catalogueService.cloneCatalogue(loggedInUserId, catalogueId, catalogue);
+      res.status(200).json({
+        status: true,
+        msg: 'Catalogue cloned successfully!',
+        data: cloned,
+      });
+    } catch (err) {
+      const msg = (err as Error).message;
+      let httpStatus = 500;
+      if (msg === 'Catalogue not found') {
+        httpStatus = 404;
+      } else if (msg === 'A catalogue with this name already exists') {
+        httpStatus = 400;
+      }
+      res.status(httpStatus).json({
+        status: false,
+        msg: msg === 'Catalogue not found' || msg === 'A catalogue with this name already exists' ? msg : 'An error occurred',
+        error: msg,
+      });
+    }
+  }
 }
 
 export const catalogueController = new CatalogueController();

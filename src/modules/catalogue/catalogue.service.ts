@@ -166,6 +166,11 @@ export class CatalogueService {
     const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
     await catalogueRepository.updateCataloguePrivacy(catalogueId, companyId, privacyLevel);
   }
+
+  async cloneCatalogue(loggedInUserId: number, catalogueId: number, customName: string): Promise<CatalogRes> {
+    const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
+    return await catalogueRepository.cloneCatalogue(loggedInUserId, companyId, catalogueId, customName);
+  }
 }
 
 export const catalogueService = new CatalogueService();

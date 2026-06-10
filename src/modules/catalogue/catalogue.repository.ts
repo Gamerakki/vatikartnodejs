@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/database';
 import { CatalogueQueryParams, CatalogRes } from './catalogue.interface';
+import { sanitizeString, generateRandom12DigitString } from '../../utils/common';
 
 export class CatalogueRepository {
   async saveCatalogue(data: {
@@ -444,6 +445,168 @@ export class CatalogueRepository {
       where: { catalogueId: BigInt(catalogueId) },
       data: { privacyLevel }
     });
+  }
+
+  async cloneCatalogue(
+    loggedInUserId: number,
+    companyId: number,
+    catalogueId: number,
+    customName: string
+  ): Promise<CatalogRes> {
+    const duplicateCount = await prisma.catalogue.count({
+      where: {
+        companyId: BigInt(companyId),
+        catalogue: {
+          equals: customName.trim(),
+          mode: 'insensitive',
+        },
+        isDeleted: false,
+      },
+    });
+
+    if (duplicateCount > 0) {
+      throw new Error('A catalogue with this name already exists');
+    }
+
+    const catalogue = await prisma.catalogue.findFirst({
+      where: {
+        catalogueId: BigInt(catalogueId),
+        companyId: BigInt(companyId),
+        isDeleted: false,
+      },
+    });
+
+    if (!catalogue) {
+      throw new Error('Catalogue not found');
+    }
+
+    const newTitle = customName.trim();
+    const newSlug = `${sanitizeString(newTitle)}-${generateRandom12DigitString()}`;
+
+    const products = await prisma.product.findMany({
+      where: {
+        catalogueId: BigInt(catalogueId),
+        isDeleted: false,
+      },
+      include: {
+        images: true,
+        bulkDiscounts: true,
+        variantOptions: {
+          include: {
+            inventories: true,
+          },
+        },
+      },
+    });
+
+    const cloned = await prisma.$transaction(async (tx) => {
+      const newCat = await tx.catalogue.create({
+        data: {
+          catalogue: newTitle,
+          companyId: BigInt(companyId),
+          addedBy: BigInt(loggedInUserId),
+          slug: newSlug,
+          isPublished: catalogue.isPublished,
+          privacyLevel: catalogue.privacyLevel,
+          addedDate: new Date(),
+        },
+      });
+
+      for (const p of products) {
+        let newSku: string | null = null;
+        if (p.sku) {
+          const suffix = `-copy-${generateRandom12DigitString().substring(0, 4)}`;
+          const maxOriginalLen = 50 - suffix.length;
+          newSku = p.sku.substring(0, maxOriginalLen) + suffix;
+        }
+        const newProductSlug = `${sanitizeString(p.product)}-${generateRandom12DigitString()}`;
+
+        const newProd = await tx.product.create({
+          data: {
+            product: p.product,
+            sku: newSku,
+            description: p.description,
+            price: p.price,
+            priceMode: p.priceMode,
+            setQuantity: p.setQuantity,
+            meterQuantity: p.meterQuantity,
+            setName: p.setName,
+            minimumOrderQty: p.minimumOrderQty,
+            companyId: BigInt(companyId),
+            addedBy: BigInt(loggedInUserId),
+            slug: newProductSlug,
+            catalogueId: newCat.catalogueId,
+            reorderLevel: p.reorderLevel,
+            maxStock: p.maxStock,
+            addedDate: new Date(),
+          },
+        });
+
+        if (p.images.length > 0) {
+          await tx.productImage.createMany({
+            data: p.images.map((img) => ({
+              productId: newProd.productId,
+              productImgPath: img.productImgPath,
+            })),
+          });
+        }
+
+        if (p.bulkDiscounts.length > 0) {
+          await tx.productBulkDiscountSlab.createMany({
+            data: p.bulkDiscounts.map((slab) => ({
+              productId: newProd.productId,
+              minQty: slab.minQty,
+              maxQty: slab.maxQty,
+              discountedPrice: slab.discountedPrice,
+              discountPercent: slab.discountPercent,
+              sortOrder: slab.sortOrder,
+            })),
+          });
+        }
+
+        for (const opt of p.variantOptions) {
+          const newOpt = await tx.productVariantOption.create({
+            data: {
+              productId: newProd.productId,
+              optionType: opt.optionType,
+              label: opt.label,
+              accent: opt.accent,
+              sortOrder: opt.sortOrder,
+            },
+          });
+
+          if (opt.inventories.length > 0) {
+            await tx.productVariantInventory.createMany({
+              data: opt.inventories.map((inv) => ({
+                productId: newProd.productId,
+                optionId: newOpt.optionId,
+                quantity: inv.quantity,
+              })),
+            });
+          }
+        }
+      }
+
+      return newCat;
+    });
+
+    const thumbnailImages = products
+      .slice(0, 4)
+      .map((p) => p.images[0]?.productImgPath)
+      .filter(Boolean)
+      .join(',');
+
+    return {
+      catalogue_id: Number(cloned.catalogueId),
+      catalogue: cloned.catalogue,
+      added_date: cloned.addedDate,
+      is_published: cloned.isPublished,
+      total_products_count: products.length,
+      total_visitors: 0,
+      thumbnail_images: thumbnailImages,
+      slug: cloned.slug || null,
+      privacy_level: cloned.privacyLevel,
+    };
   }
 }
 

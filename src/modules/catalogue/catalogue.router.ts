@@ -12,6 +12,7 @@ router.post('/public/:catalogue_id/request-access', catalogueController.createAc
 router.use(validateAuth);
 
 router.post('/save', catalogueController.saveCatalogue);
+router.post('/clone/:catalogue_id', catalogueController.cloneCatalogue);
 router.get('/fetch-list', catalogueController.fetchCatalogues);
 router.get('/fetch-data/:catalogue_id', catalogueController.fetchCatalogueData);
 router.delete('/delete', catalogueController.deleteCatalogue);
