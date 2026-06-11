@@ -7,6 +7,7 @@ import {
   saveVariantOptionsSchema,
   saveInventorySchema,
   restockInventorySchema,
+  deleteProductSchema,
 } from './product.validation';
 
 export class ProductController {
@@ -395,6 +396,41 @@ export class ProductController {
         status: false,
         msg: msg === 'Product not found' ? 'Product not found' : 'An error occurred',
         error: msg,
+      });
+    }
+  }
+
+  async deleteProduct(req: Request, res: Response): Promise<void> {
+    const parseResult = deleteProductSchema.safeParse(req.body);
+
+    if (!parseResult.success) {
+      const formattedErrors: Record<string, string> = {};
+      parseResult.error.issues.forEach((issue) => {
+        const fieldPath = issue.path.join('.');
+        formattedErrors[fieldPath] = issue.message;
+      });
+
+      res.status(501).json({
+        status: false,
+        msg: 'Validation errors',
+        error: formattedErrors,
+      });
+      return;
+    }
+
+    const loggedInUserId = res.locals.userId || 0;
+
+    try {
+      await productService.deleteProducts(loggedInUserId, parseResult.data.product_ids);
+      res.status(200).json({
+        status: true,
+        msg: 'Product deleted successfully!',
+      });
+    } catch (err) {
+      res.status(500).json({
+        status: false,
+        msg: 'An error occurred',
+        error: (err as Error).message,
       });
     }
   }

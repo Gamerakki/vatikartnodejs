@@ -536,6 +536,19 @@ export class ProductRepository {
       return true;
     });
   }
+
+  async softDeleteProducts(productIds: number[], companyId: number): Promise<void> {
+    const bigIds = productIds.map((id) => BigInt(id));
+    await prisma.product.updateMany({
+      where: {
+        productId: { in: bigIds },
+        companyId: BigInt(companyId),
+      },
+      data: {
+        isDeleted: true,
+      },
+    });
+  }
 }
 
 export const productRepository = new ProductRepository();

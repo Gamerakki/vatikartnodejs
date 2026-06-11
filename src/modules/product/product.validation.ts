@@ -76,3 +76,8 @@ export const restockInventorySchema = z.object({
   quantity: z.number().min(1, { message: 'quantity must be at least 1' }),
 });
 
+export const deleteProductSchema = z.object({
+  product_ids: z.array(z.number()).min(1, { message: 'The field product_ids must have at least 1 item' }),
+});
+
+

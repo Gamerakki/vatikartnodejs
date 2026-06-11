@@ -430,6 +430,11 @@ export class ProductService {
     const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
     return await productRepository.restockInventory(productId, companyId, amount);
   }
+
+  async deleteProducts(loggedInUserId: number, productIds: number[]): Promise<void> {
+    const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
+    await productRepository.softDeleteProducts(productIds, companyId);
+  }
 }
 
 export const productService = new ProductService();

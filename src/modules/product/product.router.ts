@@ -25,5 +25,6 @@ router.get('/fetch-inventory/:product_id', productController.fetchInventory);
 router.get('/inventory/list', productController.fetchInventoryList);
 router.get('/inventory/stats', productController.fetchInventoryStats);
 router.patch('/inventory/restock', productController.restockInventory);
+router.delete('/delete', productController.deleteProduct);
 
 export const productRouter = router;
