@@ -61,10 +61,181 @@ async function getExportCatalogueData(catalogueIdOrSlug: string) {
   };
 }
 
+type ExportCataloguePayload = Awaited<ReturnType<typeof getExportCatalogueData>>;
+type ExportProduct = ExportCataloguePayload['products'][number];
+type PdfTheme = 'minimalist' | 'bold' | 'corporate' | 'classic';
+
+function normalizePdfTheme(themeValue: string): PdfTheme {
+  const normalized = themeValue.toLowerCase();
+  if (normalized === 'minimalist') return 'minimalist';
+  if (normalized === 'bold') return 'bold';
+  if (normalized === 'classic') return 'classic';
+  return 'corporate';
+}
+
+function truncateText(value: string | null | undefined, maxLength: number): string {
+  const text = (value || '').trim();
+  if (!text) return 'NA';
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, Math.max(0, maxLength - 1)).trim()}…`;
+}
+
+function getPdfThemeTokens(theme: PdfTheme) {
+  if (theme === 'minimalist') {
+    return {
+      pageBackground: '#FFFFFF',
+      headerBackground: null,
+      headerText: '#111827',
+      titleColor: '#111827',
+      subtitleColor: '#6B7280',
+      cardBackground: '#FFFFFF',
+      cardBorder: '#D1D5DB',
+      cardBorderWidth: 0.8,
+      accent: '#6B7280',
+      bodyText: '#1F2937',
+      mutedText: '#6B7280',
+      titleFont: 'Helvetica-Bold',
+      bodyFont: 'Helvetica',
+    };
+  }
+
+  if (theme === 'bold') {
+    return {
+      pageBackground: '#FFF7ED',
+      headerBackground: '#0F766E',
+      headerText: '#FFFFFF',
+      titleColor: '#0F172A',
+      subtitleColor: '#475569',
+      cardBackground: '#FFFFFF',
+      cardBorder: '#F97316',
+      cardBorderWidth: 2,
+      accent: '#EA580C',
+      bodyText: '#0F172A',
+      mutedText: '#475569',
+      titleFont: 'Helvetica-Bold',
+      bodyFont: 'Helvetica',
+    };
+  }
+
+  return {
+    pageBackground: '#F8FAFC',
+    headerBackground: '#E2E8F0',
+    headerText: '#0F172A',
+    titleColor: '#0F172A',
+    subtitleColor: '#475569',
+    cardBackground: '#FFFFFF',
+    cardBorder: '#CBD5E1',
+    cardBorderWidth: 1.2,
+    accent: '#0F766E',
+    bodyText: '#0F172A',
+    mutedText: '#475569',
+    titleFont: 'Helvetica-Bold',
+    bodyFont: 'Helvetica',
+  };
+}
+
+function renderCataloguePdfHeader(doc: PDFKit.PDFDocument, payload: ExportCataloguePayload, theme: PdfTheme, columns: 1 | 2) {
+  const tokens = getPdfThemeTokens(theme);
+  const left = doc.page.margins.left;
+  const right = doc.page.width - doc.page.margins.right;
+  const width = right - left;
+  const top = doc.y;
+  const headerHeight = theme === 'minimalist' ? 66 : 82;
+
+  if (tokens.headerBackground) {
+    doc.save();
+    doc.roundedRect(left, top, width, headerHeight, 14).fill(tokens.headerBackground);
+    doc.restore();
+  }
+
+  const inset = left + 18;
+  const headerTextColor = tokens.headerBackground ? tokens.headerText : tokens.titleColor;
+  const metaColor = tokens.headerBackground ? 'rgba(255,255,255,0.88)' : tokens.subtitleColor;
+
+  doc.font(tokens.titleFont).fontSize(theme === 'bold' ? 22 : 20).fillColor(headerTextColor).text(payload.title, inset, top + 16, {
+    width: width - 36,
+  });
+
+  doc.font(tokens.bodyFont).fontSize(10).fillColor(metaColor).text(
+    `${payload.companyName || 'VatiKart'} • ${payload.products.length} products • ${columns === 2 ? '2-column grid' : '1-column list'} • ${theme} theme`,
+    inset,
+    top + (theme === 'bold' ? 48 : 42),
+    { width: width - 36 },
+  );
+
+  if (payload.logoUrl) {
+    doc.fontSize(9).fillColor(metaColor).text(`Logo: ${payload.logoUrl}`, inset, top + headerHeight - 18, {
+      width: width - 36,
+      lineBreak: false,
+    });
+  }
+
+  doc.y = top + headerHeight + 12;
+}
+
+function renderProductCard(
+  doc: PDFKit.PDFDocument,
+  product: ExportProduct,
+  index: number,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  theme: PdfTheme,
+) {
+  const tokens = getPdfThemeTokens(theme);
+  const padding = theme === 'minimalist' ? 12 : 14;
+
+  doc.save();
+  doc.roundedRect(x, y, width, height, 12).fillAndStroke(tokens.cardBackground, tokens.cardBorder);
+  doc.lineWidth(tokens.cardBorderWidth).roundedRect(x, y, width, height, 12).stroke(tokens.cardBorder);
+  doc.restore();
+
+  const contentX = x + padding;
+  let cursorY = y + padding;
+  const contentWidth = width - padding * 2;
+
+  doc.font(tokens.titleFont).fontSize(theme === 'bold' ? 13 : 12).fillColor(tokens.titleColor).text(
+    `${index + 1}. ${truncateText(product.product, theme === 'bold' ? 42 : 56)}`,
+    contentX,
+    cursorY,
+    { width: contentWidth },
+  );
+  cursorY += theme === 'bold' ? 22 : 20;
+
+  const priceText = product.price != null ? `Rs ${Number(product.price).toFixed(2)}` : 'NA';
+  const mrpText = product.originalPrice != null ? `Rs ${Number(product.originalPrice).toFixed(2)}` : 'NA';
+
+  doc.font(tokens.bodyFont).fontSize(9.5).fillColor(tokens.bodyText).text(`SKU: ${product.sku || 'NA'}`, contentX, cursorY, { width: contentWidth });
+  cursorY += 14;
+  doc.text(`Price: ${priceText}   MRP: ${mrpText}`, contentX, cursorY, { width: contentWidth });
+  cursorY += 14;
+  doc.text(`MOQ: ${product.minimumOrderQty ?? 1}   Mode: ${product.priceMode || 'perPiece'}`, contentX, cursorY, { width: contentWidth });
+  cursorY += 14;
+
+  doc.font(tokens.bodyFont).fontSize(8.5).fillColor(tokens.mutedText).text(
+    `Description: ${truncateText(product.description, width < 250 ? 60 : 140)}`,
+    contentX,
+    cursorY,
+    { width: contentWidth },
+  );
+  cursorY += width < 250 ? 28 : 18;
+
+  doc.fontSize(8).fillColor(tokens.accent).text(
+    `Image: ${truncateText(toCdnUrl(product.images[0]?.productImgPath || ''), width < 250 ? 42 : 78)}`,
+    contentX,
+    Math.min(cursorY, y + height - 18),
+    { width: contentWidth },
+  );
+}
+
 export class CatalogueController {
   async exportCataloguePdf(req: Request, res: Response): Promise<void> {
     try {
       const payload = await getExportCatalogueData(req.params.catalogueId);
+      const theme = normalizePdfTheme(String(req.query.theme || 'corporate'));
+      const columns = Number(req.query.columns) === 2 ? 2 : 1;
+      const tokens = getPdfThemeTokens(theme);
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', 'attachment; filename="catalogue-export.pdf"');
@@ -72,32 +243,50 @@ export class CatalogueController {
       const doc = new PDFDocument({ size: 'A4', margin: 36 });
       doc.pipe(res);
 
-      doc.fontSize(20).text(payload.title, { underline: false });
-      if (payload.companyName) {
-        doc.moveDown(0.25);
-        doc.fontSize(11).fillColor('#444444').text(`Company: ${payload.companyName}`);
-      }
-      if (payload.logoUrl) {
-        doc.moveDown(0.25);
-        doc.fontSize(10).fillColor('#666666').text(`Logo: ${payload.logoUrl}`);
-      }
-      doc.moveDown(0.75);
-      doc.fillColor('#000000').fontSize(10).text(`Products: ${payload.products.length}`);
-      doc.moveDown(0.8);
+      doc.rect(0, 0, doc.page.width, doc.page.height).fill(tokens.pageBackground);
+      doc.fillColor(tokens.bodyText);
+      doc.y = doc.page.margins.top;
+
+      renderCataloguePdfHeader(doc, payload, theme, columns);
+
+      const gap = 14;
+      const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      const cardWidth = columns === 2 ? (contentWidth - gap) / 2 : contentWidth;
+      const cardHeight = columns === 2 ? 138 : theme === 'minimalist' ? 104 : 116;
+      let x = doc.page.margins.left;
+      let y = doc.y;
+      let columnIndex = 0;
 
       payload.products.forEach((product, index) => {
-        if (doc.y > 730) {
+        const needsNewPage = columns === 2
+          ? y + cardHeight > doc.page.height - doc.page.margins.bottom
+          : y + cardHeight > doc.page.height - doc.page.margins.bottom;
+
+        if (needsNewPage) {
           doc.addPage();
+          doc.rect(0, 0, doc.page.width, doc.page.height).fill(tokens.pageBackground);
+          doc.fillColor(tokens.bodyText);
+          doc.y = doc.page.margins.top;
+          renderCataloguePdfHeader(doc, payload, theme, columns);
+          x = doc.page.margins.left;
+          y = doc.y;
+          columnIndex = 0;
         }
 
-        doc.fontSize(13).fillColor('#111111').text(`${index + 1}. ${product.product}`);
-        doc.moveDown(0.15);
-        doc.fontSize(10).fillColor('#333333').text(`SKU: ${product.sku || 'NA'}`);
-        doc.fontSize(10).text(`Price: ${product.price != null ? `Rs ${Number(product.price).toFixed(2)}` : 'NA'} | MRP: ${product.originalPrice != null ? `Rs ${Number(product.originalPrice).toFixed(2)}` : 'NA'}`);
-        doc.fontSize(10).text(`Minimum Order Qty: ${product.minimumOrderQty ?? 1}`);
-        doc.fontSize(10).text(`Description: ${product.description || 'NA'}`);
-        doc.fontSize(9).fillColor('#666666').text(`Image: ${toCdnUrl(product.images[0]?.productImgPath || '') || 'NA'}`);
-        doc.moveDown(0.7);
+        renderProductCard(doc, product, index, x, y, cardWidth, cardHeight, theme);
+
+        if (columns === 2) {
+          if (columnIndex === 0) {
+            x = doc.page.margins.left + cardWidth + gap;
+            columnIndex = 1;
+          } else {
+            x = doc.page.margins.left;
+            y += cardHeight + gap;
+            columnIndex = 0;
+          }
+        } else {
+          y += cardHeight + gap;
+        }
       });
 
       doc.end();
