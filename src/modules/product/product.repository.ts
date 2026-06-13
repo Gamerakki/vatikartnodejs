@@ -74,6 +74,9 @@ export class ProductRepository {
         product: p.product,
         sku: p.sku,
         price: p.price ? Number(p.price) : null,
+        original_price: p.originalPrice ? Number(p.originalPrice) : null,
+        gst_rate: p.gstRate ? Number(p.gstRate) : null,
+        unit_type: p.unitType,
         img_path: p.images[0]?.productImgPath || null,
         images: p.images.map((img: any) => img.productImgPath),
         slug: p.slug,
@@ -148,6 +151,9 @@ export class ProductRepository {
         product: p.product,
         sku: p.sku,
         price: p.price ? Number(p.price) : null,
+        original_price: p.originalPrice ? Number(p.originalPrice) : null,
+        gst_rate: p.gstRate ? Number(p.gstRate) : null,
+        unit_type: p.unitType,
         img_path: p.images[0]?.productImgPath || null,
         images: p.images.map((img: any) => img.productImgPath),
         slug: p.slug,
@@ -189,7 +195,10 @@ export class ProductRepository {
       sku: string | null;
       description: string | null;
       price: number | null;
+      originalPrice: number | null;
+      gstRate: number | null;
       priceMode: string | null;
+      unitType: string | null;
       setQuantity: number | null;
       meterQuantity: number | null;
       setName: string | null;
@@ -219,7 +228,10 @@ export class ProductRepository {
           sku: product.sku,
           description: product.description,
           price: product.price,
+          originalPrice: product.originalPrice,
+          gstRate: product.gstRate,
           priceMode: product.priceMode,
+          unitType: product.unitType,
           setQuantity: product.setQuantity,
           meterQuantity: product.meterQuantity,
           setName: product.setName,

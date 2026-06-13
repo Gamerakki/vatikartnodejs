@@ -34,6 +34,9 @@ export interface ProductListItemRes {
   product: string;
   sku: string | null;
   price: number | null;
+  original_price: number | null;
+  gst_rate: number | null;
+  unit_type: string | null;
   img_path: string | null;
   images?: string[];
   slug: string | null;
@@ -63,7 +66,10 @@ export interface SaveBasicInfoReq {
   title: string;
   sku?: string | null;
   price?: number | null;
+  original_price?: number | null;
+  gst_rate?: number | null;
   price_mode?: string | null;
+  unit_type?: string | null;
   set_quantity?: number | null;
   meter_quantity?: number | null;
   set_name?: string | null;
@@ -128,7 +134,10 @@ export interface BasicInfoRes {
   title: string;
   sku: string | null;
   price: number | null;
+  original_price: number | null;
+  gst_rate: number | null;
   price_mode: string | null;
+  unit_type: string | null;
   set_quantity: number | null;
   meter_quantity: number | null;
   set_name: string | null;

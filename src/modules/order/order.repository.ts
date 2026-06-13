@@ -250,7 +250,73 @@ export class OrderRepository {
     }
 
     return await prisma.$transaction(async (tx) => {
-      // 1. Create Order
+      // 1. Fetch products and check prices, slabs, MOQ, and GST
+      const productIds = data.items.map((item) => BigInt(item.product_id));
+      const dbProducts = await tx.product.findMany({
+        where: { productId: { in: productIds } },
+        include: {
+          bulkDiscounts: {
+            orderBy: { sortOrder: 'asc' },
+          },
+        },
+      });
+
+      const productMap = new Map(dbProducts.map((p) => [Number(p.productId), p]));
+      let calculatedSubtotal = 0;
+      let calculatedTax = 0;
+
+      for (const item of data.items) {
+        const dbProduct = productMap.get(item.product_id);
+        if (!dbProduct) {
+          throw new Error(`Product ID ${item.product_id} not found`);
+        }
+
+        // Validate MOQ (Minimum Order Quantity)
+        const moq = dbProduct.minimumOrderQty ?? 0;
+        if (moq > 0 && item.qty < moq) {
+          throw new Error(`Product "${dbProduct.product}" requires a minimum order of ${moq} units.`);
+        }
+
+        // Determine price, checking slabs
+        let itemPrice = dbProduct.price ? Number(dbProduct.price) : 0;
+        const slabs = dbProduct.bulkDiscounts;
+        for (const slab of slabs) {
+          if (item.qty >= slab.minQty && (slab.maxQty === null || item.qty <= slab.maxQty)) {
+            if (slab.discountedPrice != null) {
+              itemPrice = Number(slab.discountedPrice);
+            } else if (slab.discountPercent != null && dbProduct.price != null) {
+              const basePrice = Number(dbProduct.price);
+              itemPrice = basePrice * (1 - Number(slab.discountPercent) / 100);
+            }
+          }
+        }
+
+        // Overwrite client-provided item price with secure server-validated price
+        item.price = itemPrice;
+        const itemSubtotal = itemPrice * item.qty;
+        calculatedSubtotal += itemSubtotal;
+
+        // Dynamic tax calculation per product
+        const gstRate = dbProduct.gstRate ? Number(dbProduct.gstRate) : 0;
+        calculatedTax += itemSubtotal * (gstRate / 100);
+      }
+
+      const serverSubtotal = Number(calculatedSubtotal.toFixed(2));
+      const serverTax = Number(calculatedTax.toFixed(2));
+      const serverTotal = Number(
+        (serverSubtotal - data.discount + data.shipping + serverTax).toFixed(2)
+      );
+
+      // Verify that client totals do not deviate significantly (allowing ₹1 rounding tolerance)
+      if (Math.abs(data.subtotal - serverSubtotal) > 1.0 || Math.abs(data.total - serverTotal) > 1.0) {
+        throw new Error('Price verification failed. Some prices or taxes have changed. Please refresh your cart.');
+      }
+
+      // Commit exact server calculations to DB
+      data.subtotal = serverSubtotal;
+      data.total = serverTotal;
+
+      // 2. Create Order
       const newOrder = await tx.order.create({
         data: {
           customerName: data.customer_name,
@@ -265,17 +331,12 @@ export class OrderRepository {
         },
       });
 
-      // 2. Create Order Items & Deduct Stock
+      // 3. Create Order Items & Deduct Stock
       for (const item of data.items) {
         const prodBig = BigInt(item.product_id);
+        const dbProduct = productMap.get(item.product_id);
 
-        // Fetch product title and sku for order item entry
-        const product = await tx.product.findUnique({
-          where: { productId: prodBig },
-          select: { product: true, sku: true },
-        });
-
-        if (!product) {
+        if (!dbProduct) {
           throw new Error(`Product ID ${item.product_id} not found`);
         }
 
@@ -283,8 +344,8 @@ export class OrderRepository {
           data: {
             orderId: newOrder.orderId,
             productId: prodBig,
-            title: product.product,
-            sku: product.sku || '',
+            title: dbProduct.product,
+            sku: dbProduct.sku || '',
             qty: item.qty,
             price: item.price,
           },
