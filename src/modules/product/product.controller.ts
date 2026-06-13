@@ -8,6 +8,7 @@ import {
   saveInventorySchema,
   restockInventorySchema,
   deleteProductSchema,
+  saveSetCompositionSchema,
 } from './product.validation';
 
 export class ProductController {
@@ -425,6 +426,41 @@ export class ProductController {
       res.status(200).json({
         status: true,
         msg: 'Product deleted successfully!',
+      });
+    } catch (err) {
+      res.status(500).json({
+        status: false,
+        msg: 'An error occurred',
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  async saveSetComposition(req: Request, res: Response): Promise<void> {
+    const parseResult = saveSetCompositionSchema.safeParse(req.body);
+
+    if (!parseResult.success) {
+      const formattedErrors: Record<string, string> = {};
+      parseResult.error.issues.forEach((issue) => {
+        const fieldPath = issue.path.join('.');
+        formattedErrors[fieldPath] = issue.message;
+      });
+
+      res.status(501).json({
+        status: false,
+        msg: 'Validation errors',
+        error: formattedErrors,
+      });
+      return;
+    }
+
+    const loggedInUserId = res.locals.userId || 0;
+
+    try {
+      await productService.saveSetComposition(loggedInUserId, parseResult.data);
+      res.status(200).json({
+        status: true,
+        msg: 'Product set composition saved successfully!',
       });
     } catch (err) {
       res.status(500).json({

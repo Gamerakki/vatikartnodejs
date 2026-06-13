@@ -18,6 +18,8 @@ router.get('/fetch-list/:catalogue_id', productController.fetchProductsByCatalog
 router.patch('/save-basic-info', productController.saveBasicInfo);
 router.patch('/save-variant-options', productController.saveVariantOptions);
 router.patch('/save-inventory', productController.saveInventory);
+router.patch('/save-set-composition', productController.saveSetComposition);
+
 
 router.get('/fetch-basic-info/:product_id', productController.fetchBasicInfo);
 router.get('/fetch-inventory/:product_id', productController.fetchInventory);

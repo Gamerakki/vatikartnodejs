@@ -316,19 +316,19 @@ export class OrderRepository {
             }
           }
         } else {
-          // If no size is specified but the product might have optionless stock
-          // e.g. "One Size" option. Let's find it.
-          const oneSizeOption = await tx.productVariantOption.findFirst({
+          // If no size is specified, check if there is exactly one size option for this product
+          // (covers both optionless 'One Size' and set products with a single standard option)
+          const sizeOptions = await tx.productVariantOption.findMany({
             where: {
               productId: prodBig,
               optionType: 'size',
-              label: { equals: 'One Size', mode: 'insensitive' },
             },
           });
 
-          if (oneSizeOption) {
+          if (sizeOptions.length === 1) {
+            const onlyOption = sizeOptions[0];
             const inventory = await tx.productVariantInventory.findFirst({
-              where: { productId: prodBig, optionId: oneSizeOption.optionId },
+              where: { productId: prodBig, optionId: onlyOption.optionId },
             });
 
             if (inventory) {

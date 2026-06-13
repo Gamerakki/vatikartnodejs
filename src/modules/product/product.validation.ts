@@ -80,4 +80,17 @@ export const deleteProductSchema = z.object({
   product_ids: z.array(z.number()).min(1, { message: 'The field product_ids must have at least 1 item' }),
 });
 
+export const setCompositionItemSchema = z.object({
+  size_label: z.string().min(1).max(50),
+  color_label: z.string().min(1).max(50),
+  color_hex: z.string().nullable().optional(),
+  qty_in_set: z.number().int().gt(0),
+});
+
+export const saveSetCompositionSchema = z.object({
+  product_id: z.number({ required_error: 'The field product_id is required' }),
+  composition: z.array(setCompositionItemSchema),
+});
+
+
 

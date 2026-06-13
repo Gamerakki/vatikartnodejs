@@ -171,6 +171,7 @@ export class CompanyRepository {
         address: true,
         pincode: true,
         logoImgPath: true,
+        subdomain: true,
       },
     });
 
@@ -182,6 +183,7 @@ export class CompanyRepository {
       address: company.address,
       pincode: company.pincode,
       logo_img_path: company.logoImgPath,
+      subdomain: company.subdomain || null,
     };
   }
 
