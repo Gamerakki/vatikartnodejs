@@ -9,6 +9,19 @@ import app from './app';
 import { connectDatabase, prisma } from './config/database';
 import { connectRedis, redis } from './config/redis';
 import { logger } from './config/logger';
+import { createServer } from 'http';
+import { Server, Socket } from 'socket.io';
+
+type JoinCompanyRoomPayload = {
+  companyId: number | string;
+};
+
+type StorefrontActivityPayload = {
+  companyId: number | string;
+  activityType: 'view_catalog' | 'view_product';
+  label: string;
+  timestamp: string;
+};
 
 const portRaw = process.env.PORT || '8080';
 // Go port includes leading colon, e.g. ":8080"
@@ -19,7 +32,28 @@ async function bootstrap() {
   await connectDatabase();
   await connectRedis();
 
-  const server = app.listen(port, () => {
+  const httpServer = createServer(app);
+  const io = new Server(httpServer, {
+    cors: {
+      origin: (process.env.ALLOWED_ORIGINS || '').split(','),
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+      credentials: process.env.ALLOW_CREDENTIALS !== 'false',
+    },
+  });
+
+  io.on('connection', (socket: Socket) => {
+    socket.on('join_company_room', ({ companyId }: JoinCompanyRoomPayload) => {
+      if (!companyId) return;
+      socket.join(`company:${companyId}`);
+    });
+
+    socket.on('storefront_activity', (payload: StorefrontActivityPayload) => {
+      if (!payload?.companyId) return;
+      io.to(`company:${payload.companyId}`).emit('storefront_activity', payload);
+    });
+  });
+
+  const server = httpServer.listen(port, () => {
     logger.info(`Server started on port :${port}`);
   });
 

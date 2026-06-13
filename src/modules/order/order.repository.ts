@@ -1,6 +1,34 @@
 import { prisma } from '../../config/database';
 import { OrderItemRes, OrderDetailRes, OrderStatus } from './order.interface';
 
+function getServerItemPrice(
+  dbProduct: {
+    price: any;
+    bulkDiscounts: Array<{
+      minQty: number;
+      maxQty: number | null;
+      discountedPrice: any;
+      discountPercent: any;
+    }>;
+  },
+  qty: number
+): number {
+  let itemPrice = dbProduct.price ? Number(dbProduct.price) : 0;
+
+  for (const slab of dbProduct.bulkDiscounts) {
+    if (qty >= slab.minQty && (slab.maxQty === null || qty <= slab.maxQty)) {
+      if (slab.discountedPrice != null) {
+        itemPrice = Number(slab.discountedPrice);
+      } else if (slab.discountPercent != null && dbProduct.price != null) {
+        const basePrice = Number(dbProduct.price);
+        itemPrice = basePrice * (1 - Number(slab.discountPercent) / 100);
+      }
+    }
+  }
+
+  return Number(itemPrice.toFixed(2));
+}
+
 export class OrderRepository {
   async fetchOrdersByCompany(companyId: number): Promise<OrderItemRes[]> {
     const orders = await prisma.order.findMany({
@@ -277,21 +305,12 @@ export class OrderRepository {
           throw new Error(`Product "${dbProduct.product}" requires a minimum order of ${moq} units.`);
         }
 
-        // Determine price, checking slabs
-        let itemPrice = dbProduct.price ? Number(dbProduct.price) : 0;
-        const slabs = dbProduct.bulkDiscounts;
-        for (const slab of slabs) {
-          if (item.qty >= slab.minQty && (slab.maxQty === null || item.qty <= slab.maxQty)) {
-            if (slab.discountedPrice != null) {
-              itemPrice = Number(slab.discountedPrice);
-            } else if (slab.discountPercent != null && dbProduct.price != null) {
-              const basePrice = Number(dbProduct.price);
-              itemPrice = basePrice * (1 - Number(slab.discountPercent) / 100);
-            }
-          }
+        const itemPrice = getServerItemPrice(dbProduct, item.qty);
+
+        if (Math.abs(Number(item.price) - itemPrice) > 0.5) {
+          throw new Error('Price validation failed; order rejected');
         }
 
-        // Overwrite client-provided item price with secure server-validated price
         item.price = itemPrice;
         const itemSubtotal = itemPrice * item.qty;
         calculatedSubtotal += itemSubtotal;
@@ -307,9 +326,9 @@ export class OrderRepository {
         (serverSubtotal - data.discount + data.shipping + serverTax).toFixed(2)
       );
 
-      // Verify that client totals do not deviate significantly (allowing ₹1 rounding tolerance)
-      if (Math.abs(data.subtotal - serverSubtotal) > 1.0 || Math.abs(data.total - serverTotal) > 1.0) {
-        throw new Error('Price verification failed. Some prices or taxes have changed. Please refresh your cart.');
+      // Verify that client totals do not deviate significantly
+      if (Math.abs(Number(data.subtotal) - serverSubtotal) > 0.5 || Math.abs(Number(data.total) - serverTotal) > 0.5) {
+        throw new Error('Price validation failed; order rejected');
       }
 
       // Commit exact server calculations to DB
