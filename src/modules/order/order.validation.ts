@@ -38,5 +38,6 @@ export const bookOrderSchema = z.object({
   shipping: z.number().nonnegative().default(0),
   tax: z.number().nonnegative().default(0),
   total: z.number().nonnegative(),
+  reseller_markup: z.number().nonnegative().optional(),
 });
 

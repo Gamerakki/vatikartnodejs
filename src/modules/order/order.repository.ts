@@ -256,6 +256,7 @@ export class OrderRepository {
       discount: number;
       shipping: number;
       total: number;
+      reseller_markup?: number;
       items: {
         product_id: number;
         qty: number;
@@ -345,6 +346,7 @@ export class OrderRepository {
           subtotal: data.subtotal,
           discount: data.discount,
           shipping: data.shipping,
+          resellerMarkup: data.reseller_markup,
           total: data.total,
           companyId: catalogue.companyId,
         },

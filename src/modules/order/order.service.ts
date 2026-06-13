@@ -62,6 +62,7 @@ export class OrderService {
       discount: number;
       shipping: number;
       total: number;
+      reseller_markup?: number;
       items: {
         product_id: number;
         qty: number;

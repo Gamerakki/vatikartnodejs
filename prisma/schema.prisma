@@ -217,6 +217,7 @@ model Order {
   subtotal        Decimal     @db.Decimal(12, 2)
   discount        Decimal     @default(0) @db.Decimal(12, 2)
   shipping        Decimal     @default(0) @db.Decimal(12, 2)
+  resellerMarkup  Decimal?    @map("reseller_markup") @db.Decimal(5, 2)
   total           Decimal     @db.Decimal(12, 2)
   addedDate       DateTime    @default(now()) @map("added_date") @db.Timestamptz
   companyId       BigInt      @map("company_id")

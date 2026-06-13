@@ -7,6 +7,8 @@ const router = Router();
 // Public catalogue routes
 router.get('/public/:catalogue_id/products', catalogueController.fetchPublicCatalogueProducts);
 router.post('/public/:catalogue_id/request-access', catalogueController.createAccessRequest);
+router.get('/public/:catalogueId/export/pdf', catalogueController.exportCataloguePdf);
+router.get('/public/:catalogueId/export/excel', catalogueController.exportCatalogueExcel);
 
 // All other catalogue routes require authentication
 router.use(validateAuth);

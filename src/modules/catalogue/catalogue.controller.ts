@@ -2,8 +2,159 @@ import { Request, Response } from 'express';
 import { catalogueService } from './catalogue.service';
 import { saveCatalogueSchema, softDeleteRestoreCatalogueSchema } from './catalogue.validation';
 import { prisma } from '../../config/database';
+import PDFDocument from 'pdfkit';
+
+function toCdnUrl(path?: string | null): string {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  return `https://cdn.vatikart.in/${path}`;
+}
+
+function csvCell(value: unknown): string {
+  const raw = value == null ? '' : String(value);
+  const escaped = raw.replace(/"/g, '""');
+  return `"${escaped}"`;
+}
 
 export class CatalogueController {
+  private async getExportCatalogueData(catalogueIdOrSlug: string) {
+    const numericId = Number(catalogueIdOrSlug);
+    const isNumeric = Number.isFinite(numericId) && numericId > 0;
+
+    const catalogue = await prisma.catalogue.findFirst({
+      where: isNumeric
+        ? { catalogueId: BigInt(numericId), isDeleted: false, isPublished: true }
+        : { slug: catalogueIdOrSlug, isDeleted: false, isPublished: true },
+      include: {
+        company: {
+          select: {
+            companyName: true,
+            logoImgPath: true,
+          },
+        },
+      },
+    });
+
+    if (!catalogue) {
+      throw new Error('Catalogue not found');
+    }
+
+    const products = await prisma.product.findMany({
+      where: {
+        catalogueId: catalogue.catalogueId,
+        companyId: catalogue.companyId,
+        isDeleted: false,
+      },
+      include: {
+        images: {
+          orderBy: { productImgId: 'asc' },
+          take: 1,
+        },
+      },
+      orderBy: { productId: 'desc' },
+    });
+
+    return {
+      title: catalogue.catalogue || 'Catalogue Export',
+      companyName: catalogue.company?.companyName || '',
+      logoUrl: toCdnUrl(catalogue.company?.logoImgPath || ''),
+      products,
+    };
+  }
+
+  async exportCataloguePdf(req: Request, res: Response): Promise<void> {
+    try {
+      const payload = await this.getExportCatalogueData(req.params.catalogueId);
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="catalogue-export.pdf"');
+
+      const doc = new PDFDocument({ size: 'A4', margin: 36 });
+      doc.pipe(res);
+
+      doc.fontSize(20).text(payload.title, { underline: false });
+      if (payload.companyName) {
+        doc.moveDown(0.25);
+        doc.fontSize(11).fillColor('#444444').text(`Company: ${payload.companyName}`);
+      }
+      if (payload.logoUrl) {
+        doc.moveDown(0.25);
+        doc.fontSize(10).fillColor('#666666').text(`Logo: ${payload.logoUrl}`);
+      }
+      doc.moveDown(0.75);
+      doc.fillColor('#000000').fontSize(10).text(`Products: ${payload.products.length}`);
+      doc.moveDown(0.8);
+
+      payload.products.forEach((product, index) => {
+        if (doc.y > 730) {
+          doc.addPage();
+        }
+
+        doc.fontSize(13).fillColor('#111111').text(`${index + 1}. ${product.product}`);
+        doc.moveDown(0.15);
+        doc.fontSize(10).fillColor('#333333').text(`SKU: ${product.sku || 'NA'}`);
+        doc.fontSize(10).text(`Price: ${product.price != null ? `Rs ${Number(product.price).toFixed(2)}` : 'NA'} | MRP: ${product.originalPrice != null ? `Rs ${Number(product.originalPrice).toFixed(2)}` : 'NA'}`);
+        doc.fontSize(10).text(`Minimum Order Qty: ${product.minimumOrderQty ?? 1}`);
+        doc.fontSize(10).text(`Description: ${product.description || 'NA'}`);
+        doc.fontSize(9).fillColor('#666666').text(`Image: ${toCdnUrl(product.images[0]?.productImgPath || '') || 'NA'}`);
+        doc.moveDown(0.7);
+      });
+
+      doc.end();
+    } catch (err) {
+      const msg = (err as Error).message;
+      const status = msg === 'Catalogue not found' ? 404 : 500;
+      res.status(status).json({
+        status: false,
+        msg: msg === 'Catalogue not found' ? 'Catalogue not found' : 'An error occurred',
+        error: msg,
+      });
+    }
+  }
+
+  async exportCatalogueExcel(req: Request, res: Response): Promise<void> {
+    try {
+      const payload = await this.getExportCatalogueData(req.params.catalogueId);
+      const lines: string[] = [];
+
+      lines.push([
+        'Product Name',
+        'SKU',
+        'Price (₹)',
+        'MRP (₹)',
+        'GST (%)',
+        'Price Mode',
+        'Minimum Order Qty',
+        'Description',
+      ].map(csvCell).join(','));
+
+      payload.products.forEach((product) => {
+        lines.push([
+          product.product,
+          product.sku || '',
+          product.price != null ? Number(product.price).toFixed(2) : '',
+          product.originalPrice != null ? Number(product.originalPrice).toFixed(2) : '',
+          product.gstRate != null ? Number(product.gstRate).toFixed(2) : '0',
+          product.priceMode || 'perPiece',
+          product.minimumOrderQty ?? 1,
+          product.description || '',
+        ].map(csvCell).join(','));
+      });
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="catalogue-export.csv"');
+      res.status(200).send(lines.join('\n'));
+    } catch (err) {
+      const msg = (err as Error).message;
+      const status = msg === 'Catalogue not found' ? 404 : 500;
+      res.status(status).json({
+        status: false,
+        msg: msg === 'Catalogue not found' ? 'Catalogue not found' : 'An error occurred',
+        error: msg,
+      });
+    }
+  }
+
   async saveCatalogue(req: Request, res: Response): Promise<void> {
     const parseResult = saveCatalogueSchema.safeParse(req.body);
 
