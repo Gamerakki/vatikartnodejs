@@ -101,6 +101,9 @@ model Catalogue {
   slug        String?   @db.VarChar(250)
   isPublished Boolean   @default(false) @map("is_published")
   privacyLevel String   @default("PUBLIC") @map("privacy_level") @db.VarChar(20) // "PUBLIC", "PRIVATE"
+  bannerText   String?  @map("banner_text") @db.VarChar(250)
+  bannerActive Boolean  @default(false) @map("banner_active")
+  bannerImgPath String? @map("banner_img_path") @db.Text
 
   // Relations
   company       Company @relation(fields: [companyId], references: [companyId], onDelete: Cascade, onUpdate: Cascade)

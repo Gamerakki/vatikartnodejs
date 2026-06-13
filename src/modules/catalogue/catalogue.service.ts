@@ -144,6 +144,9 @@ export class CatalogueService {
     return {
       title: catalogue.title,
       privacyLevel: catalogue.privacyLevel,
+      bannerText: catalogue.bannerText,
+      bannerActive: catalogue.bannerActive,
+      bannerImgPath: catalogue.bannerImgPath,
       products,
     };
   }
@@ -170,6 +173,17 @@ export class CatalogueService {
   async cloneCatalogue(loggedInUserId: number, catalogueId: number, customName: string): Promise<CatalogRes> {
     const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
     return await catalogueRepository.cloneCatalogue(loggedInUserId, companyId, catalogueId, customName);
+  }
+
+  async updateCatalogueBanner(
+    loggedInUserId: number,
+    catalogueId: number,
+    bannerText: string | null,
+    bannerActive: boolean,
+    bannerImgPath: string | null,
+  ): Promise<void> {
+    const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
+    await catalogueRepository.updateCatalogueBanner(catalogueId, companyId, bannerText, bannerActive, bannerImgPath);
   }
 }
 

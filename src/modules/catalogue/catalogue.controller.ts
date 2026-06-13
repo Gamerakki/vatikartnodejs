@@ -3,6 +3,7 @@ import { catalogueService } from './catalogue.service';
 import { saveCatalogueSchema, softDeleteRestoreCatalogueSchema } from './catalogue.validation';
 import { prisma } from '../../config/database';
 import PDFDocument from 'pdfkit';
+import { uploadToR2 } from '../../utils/s3';
 
 function toCdnUrl(path?: string | null): string {
   if (!path) return '';
@@ -592,6 +593,9 @@ export class CatalogueController {
         msg: 'Public catalogue products fetched successfully!',
         title: result.title,
         privacyLevel: result.privacyLevel,
+        bannerText: result.bannerText ?? null,
+        bannerActive: result.bannerActive ?? false,
+        bannerImgPath: result.bannerImgPath ?? null,
         data: result.products,
       });
     } catch (err) {
@@ -722,6 +726,38 @@ export class CatalogueController {
         msg: msg === 'Catalogue not found' || msg === 'A catalogue with this name already exists' ? msg : 'An error occurred',
         error: msg,
       });
+    }
+  }
+
+  async updateCatalogueBanner(req: Request, res: Response): Promise<void> {
+    const loggedInUserId = res.locals.userId || 0;
+    const catalogueId = parseInt(req.params.catalogueId, 10);
+
+    if (isNaN(catalogueId)) {
+      res.status(400).json({ status: false, msg: 'Invalid catalogue ID' });
+      return;
+    }
+
+    try {
+      const bannerText = (req.body.banner_text as string) || null;
+      const bannerActive = req.body.banner_active === 'true' || req.body.banner_active === true;
+
+      let bannerImgPath: string | null = null;
+      if (req.file) {
+        const uploadedName = await uploadToR2('banners', req.file.buffer, req.file.originalname, req.file.mimetype);
+        bannerImgPath = `banners/${uploadedName}`;
+      }
+
+      await catalogueService.updateCatalogueBanner(loggedInUserId, catalogueId, bannerText, bannerActive, bannerImgPath);
+
+      res.status(200).json({
+        status: true,
+        msg: 'Catalogue banner updated successfully!',
+        data: { bannerText, bannerActive, bannerImgPath },
+      });
+    } catch (err) {
+      const msg = (err as Error).message;
+      res.status(500).json({ status: false, msg: 'An error occurred', error: msg });
     }
   }
 }

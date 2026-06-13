@@ -305,7 +305,7 @@ export class CatalogueRepository {
     }));
   }
 
-  async fetchPublicCatalogueData(catalogueId: number): Promise<{ catalogueId: number; companyId: number; title: string; privacyLevel: string } | null> {
+  async fetchPublicCatalogueData(catalogueId: number): Promise<{ catalogueId: number; companyId: number; title: string; privacyLevel: string; bannerText: string | null; bannerActive: boolean; bannerImgPath: string | null } | null> {
     const catalogue = await prisma.catalogue.findFirst({
       where: {
         catalogueId: BigInt(catalogueId),
@@ -321,10 +321,13 @@ export class CatalogueRepository {
       companyId: Number(catalogue.companyId),
       title: catalogue.catalogue || '',
       privacyLevel: catalogue.privacyLevel,
+      bannerText: catalogue.bannerText ?? null,
+      bannerActive: catalogue.bannerActive,
+      bannerImgPath: catalogue.bannerImgPath ?? null,
     };
   }
 
-  async fetchPublicCatalogueDataBySlug(slug: string): Promise<{ catalogueId: number; companyId: number; title: string; privacyLevel: string } | null> {
+  async fetchPublicCatalogueDataBySlug(slug: string): Promise<{ catalogueId: number; companyId: number; title: string; privacyLevel: string; bannerText: string | null; bannerActive: boolean; bannerImgPath: string | null } | null> {
     const catalogue = await prisma.catalogue.findFirst({
       where: {
         slug: slug,
@@ -340,6 +343,9 @@ export class CatalogueRepository {
       companyId: Number(catalogue.companyId),
       title: catalogue.catalogue || '',
       privacyLevel: catalogue.privacyLevel,
+      bannerText: catalogue.bannerText ?? null,
+      bannerActive: catalogue.bannerActive,
+      bannerImgPath: catalogue.bannerImgPath ?? null,
     };
   }
 
@@ -356,6 +362,27 @@ export class CatalogueRepository {
     if (access.expiresAt && new Date() > access.expiresAt) return false;
     
     return true;
+  }
+
+  async updateCatalogueBanner(
+    catalogueId: number,
+    companyId: number,
+    bannerText: string | null,
+    bannerActive: boolean,
+    bannerImgPath: string | null,
+  ): Promise<void> {
+    await prisma.catalogue.updateMany({
+      where: {
+        catalogueId: BigInt(catalogueId),
+        companyId: BigInt(companyId),
+        isDeleted: false,
+      },
+      data: {
+        bannerText: bannerText ?? undefined,
+        bannerActive,
+        ...(bannerImgPath !== null ? { bannerImgPath } : {}),
+      },
+    });
   }
 
   async createAccessRequest(catalogueId: number, phone: string, name: string): Promise<void> {
