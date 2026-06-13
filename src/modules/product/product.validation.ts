@@ -51,6 +51,8 @@ export const variantOptionSchema = z.object({
   accent: z.string().refine((val) => !val || hexColorRegex.test(val), {
     message: 'accent must be a valid hex color starting with #',
   }).nullable().optional(),
+  is_set: z.boolean().optional().default(false),
+  set_quantity: z.number().int().min(1).optional().default(1),
   sort_order: z.number().default(0),
 });
 

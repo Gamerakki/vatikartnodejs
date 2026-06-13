@@ -43,8 +43,8 @@ export interface ProductListItemRes {
   total_stock: number;
   size_count: number;
   description?: string | null;
-  sizes?: string[];
-  colors?: { name: string; hex: string | null }[];
+  sizes?: Array<{ option_id: number; label: string; accent?: string | null; is_set: boolean; set_quantity: number; sort_order: number }>;
+  colors?: Array<{ option_id: number; name: string; hex: string | null; is_set: boolean; set_quantity: number; sort_order: number }>;
   bulk_discounts?: BulkDiscountSlabRes[];
   catalogue_id?: number;
   price_mode?: string | null;
@@ -81,6 +81,8 @@ export interface SaveBasicInfoReq {
 export interface VariantOptionReq {
   label: string;
   accent?: string | null;
+  is_set?: boolean;
+  set_quantity?: number;
   sort_order: number;
 }
 
@@ -117,6 +119,8 @@ export interface VariantOptionRes {
   option_id: number;
   label: string;
   accent: string | null;
+  is_set: boolean;
+  set_quantity: number;
   sort_order: number;
 }
 

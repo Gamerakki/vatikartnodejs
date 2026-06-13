@@ -83,10 +83,21 @@ export class ProductRepository {
         total_stock: totalStock,
         size_count: sizesOptions.length,
         description: p.description,
-        sizes: sizesOptions.map((o) => o.label),
+        sizes: sizesOptions.map((o) => ({
+          option_id: Number(o.optionId),
+          label: o.label,
+          accent: o.accent,
+          is_set: o.isSet,
+          set_quantity: o.setQuantity,
+          sort_order: o.sortOrder,
+        })),
         colors: colorsOptions.map((o) => ({
+          option_id: Number(o.optionId),
           name: o.label,
           hex: o.accent,
+          is_set: o.isSet,
+          set_quantity: o.setQuantity,
+          sort_order: o.sortOrder,
         })),
         bulk_discounts: p.bulkDiscounts.map((d) => ({
           slab_id: Number(d.slabId),
@@ -160,10 +171,21 @@ export class ProductRepository {
         total_stock: totalStock,
         size_count: sizesOptions.length,
         description: p.description,
-        sizes: sizesOptions.map((o) => o.label),
+        sizes: sizesOptions.map((o) => ({
+          option_id: Number(o.optionId),
+          label: o.label,
+          accent: o.accent,
+          is_set: o.isSet,
+          set_quantity: o.setQuantity,
+          sort_order: o.sortOrder,
+        })),
         colors: colorsOptions.map((o) => ({
+          option_id: Number(o.optionId),
           name: o.label,
           hex: o.accent,
+          is_set: o.isSet,
+          set_quantity: o.setQuantity,
+          sort_order: o.sortOrder,
         })),
         bulk_discounts: p.bulkDiscounts.map((d) => ({
           slab_id: Number(d.slabId),
@@ -265,7 +287,7 @@ export class ProductRepository {
   async saveVariantOptions(
     productId: number,
     companyId: number,
-    options: { optionType: string; label: string; accent: string | null; sortOrder: number }[]
+    options: { optionType: string; label: string; accent: string | null; isSet?: boolean; setQuantity?: number; sortOrder: number }[]
   ) {
     const productIdBig = BigInt(productId);
     const companyIdBig = BigInt(companyId);
@@ -292,6 +314,8 @@ export class ProductRepository {
             optionType: opt.optionType,
             label: opt.label,
             accent: opt.accent,
+            isSet: Boolean(opt.isSet),
+            setQuantity: Math.max(1, Number(opt.setQuantity || 1)),
             sortOrder: opt.sortOrder,
           })),
         });
@@ -524,6 +548,8 @@ export class ProductRepository {
             productId: prodBig,
             optionType: 'size',
             label: 'One Size',
+            isSet: false,
+            setQuantity: 1,
             sortOrder: 0,
           },
         });
@@ -633,6 +659,8 @@ export class ProductRepository {
           productId: productIdBig,
           optionType: 'size',
           label: label,
+          isSet: true,
+          setQuantity: Math.max(1, Number(product.setQuantity || 1)),
           sortOrder: 0,
         },
       });

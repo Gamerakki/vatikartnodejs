@@ -298,7 +298,7 @@ export class ProductService {
   async saveVariantOptions(loggedInUserId: number, req: SaveVariantOptionsReq): Promise<void> {
     const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
 
-    const options: { optionType: string; label: string; accent: string | null; sortOrder: number }[] = [];
+    const options: { optionType: string; label: string; accent: string | null; isSet?: boolean; setQuantity?: number; sortOrder: number }[] = [];
 
     if (req.sizes) {
       req.sizes.forEach((s, index) => {
@@ -306,6 +306,8 @@ export class ProductService {
           optionType: 'size',
           label: s.label,
           accent: null,
+          isSet: s.is_set ?? false,
+          setQuantity: s.set_quantity ?? 1,
           sortOrder: s.sort_order ?? index,
         });
       });
@@ -317,6 +319,8 @@ export class ProductService {
           optionType: 'color',
           label: c.label,
           accent: c.accent || null,
+          isSet: c.is_set ?? false,
+          setQuantity: c.set_quantity ?? 1,
           sortOrder: c.sort_order ?? index,
         });
       });
@@ -388,6 +392,8 @@ export class ProductService {
         option_id: Number(v.optionId),
         label: v.label,
         accent: v.accent,
+        is_set: v.isSet,
+        set_quantity: v.setQuantity,
         sort_order: v.sortOrder,
       };
 

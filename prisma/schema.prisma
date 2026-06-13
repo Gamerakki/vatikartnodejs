@@ -187,6 +187,8 @@ model ProductVariantOption {
   optionType String  @map("option_type") @db.VarChar(20) // "size" or "color"
   label      String  @db.VarChar(100)
   accent     String? @db.VarChar(20)
+  isSet      Boolean @default(false) @map("is_set")
+  setQuantity Int    @default(1) @map("set_quantity")
   sortOrder  Int     @default(0) @map("sort_order")
 
   // Relations
