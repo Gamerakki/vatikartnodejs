@@ -100,9 +100,35 @@ export class CompanyRepository {
           orderBy: {
             addedDate: 'desc',
           },
-          take: 1,
           select: {
             catalogueId: true,
+            catalogue: true,
+            privacyLevel: true,
+            addedDate: true,
+            products: {
+              where: {
+                isDeleted: false,
+              },
+              take: 1,
+              select: {
+                images: {
+                  orderBy: { productImgId: 'asc' },
+                  take: 1,
+                  select: {
+                    productImgPath: true,
+                  },
+                },
+              },
+            },
+            _count: {
+              select: {
+                products: {
+                  where: {
+                    isDeleted: false,
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -114,9 +140,25 @@ export class CompanyRepository {
       company_id: Number(company.companyId),
       company_name: company.companyName,
       logo_img_path: company.logoImgPath,
+      catalogues: company.catalogues.map((c) => {
+        let cover_image = null;
+        if (c.products.length > 0 && c.products[0].images.length > 0) {
+          cover_image = c.products[0].images[0].productImgPath;
+        }
+        return {
+          catalogue_id: Number(c.catalogueId),
+          title: c.catalogue || 'Unnamed Catalogue',
+          privacy_level: c.privacyLevel,
+          added_date: c.addedDate,
+          products_count: c._count.products,
+          cover_image,
+        };
+      }),
       catalogue_id: company.catalogues.length > 0 ? Number(company.catalogues[0].catalogueId) : null,
     };
   }
+
+
 
   async fetchCompanyLogoImgPath(loggedInUserId: number): Promise<string> {
     const company = await prisma.company.findUnique({
