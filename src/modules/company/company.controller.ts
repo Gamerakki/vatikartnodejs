@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { companyService } from './company.service';
+import { companyRepository } from './company.repository';
 import {
   saveCompanySchema,
   saveSocialMediaBatchSchema,
@@ -241,6 +242,23 @@ export class CompanyController {
         msg: 'An error occurred',
         error: (err as Error).message,
       });
+    }
+  }
+
+  async updateWatermark(req: Request, res: Response): Promise<void> {
+    const loggedInUserId = res.locals.userId || 0;
+    const { watermarkEnabled } = req.body as { watermarkEnabled?: boolean };
+
+    if (typeof watermarkEnabled !== 'boolean') {
+      res.status(400).json({ status: false, msg: 'watermarkEnabled must be a boolean' });
+      return;
+    }
+
+    try {
+      await companyRepository.updateWatermarkEnabled(loggedInUserId, watermarkEnabled);
+      res.status(200).json({ status: true, msg: `Watermark ${watermarkEnabled ? 'enabled' : 'disabled'}.` });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: 'An error occurred', error: (err as Error).message });
     }
   }
 }

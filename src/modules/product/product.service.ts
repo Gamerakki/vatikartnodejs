@@ -24,6 +24,13 @@ import { generatePresignedUploadURL, uploadToR2 } from '../../utils/s3';
 export class ProductService {
   async bulkImportProducts(loggedInUserId: number, catalogueId: number, file: Express.Multer.File): Promise<any> {
     const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
+
+    // Fetch watermark settings once for all images in this batch
+    const companyData = await companyRepository.fetchCompanyDataViaUserId(loggedInUserId);
+    const watermarkEnabled = companyData?.watermark_enabled ?? false;
+    const watermarkLabel = watermarkEnabled && companyData?.company_name
+      ? `© ${companyData.company_name}`
+      : null;
     
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(file.buffer as any);
@@ -84,18 +91,44 @@ export class ProductService {
 
       if (imgBuffer) {
         // Process with sharp and upload
-        imagePromise = sharp(imgBuffer)
-          .jpeg({ quality: 80 })
-          .toBuffer()
-          .then(async (compressedBuffer) => {
+        imagePromise = (async () => {
+          try {
+            const meta = await sharp(imgBuffer).metadata();
+            const w = meta.width || 400;
+            const h = meta.height || 400;
+
+            let pipeline = sharp(imgBuffer).jpeg({ quality: 80 });
+
+            if (watermarkLabel) {
+              const fontSize = Math.max(14, Math.round(w * 0.04));
+              const padding = Math.round(fontSize * 0.6);
+              const textWidth = Math.round(watermarkLabel.length * fontSize * 0.62);
+              const textHeight = Math.round(fontSize * 1.6);
+              const svgText = Buffer.from(
+                `<svg width="${textWidth + padding * 2}" height="${textHeight}">` +
+                `<rect width="100%" height="100%" fill="rgba(0,0,0,0.35)" rx="4"/>` +
+                `<text x="${padding}" y="${Math.round(textHeight * 0.72)}" ` +
+                `font-family="Arial" font-size="${fontSize}" fill="rgba(255,255,255,0.88)">${watermarkLabel}</text>` +
+                `</svg>`
+              );
+              pipeline = sharp(await pipeline.toBuffer())
+                .composite([{
+                  input: svgText,
+                  gravity: 'southeast',
+                  left: Math.max(0, w - textWidth - padding * 2 - 10),
+                  top: Math.max(0, h - textHeight - 10),
+                }]) as typeof pipeline;
+            }
+
+            const compressedBuffer = await pipeline.toBuffer();
             const fileName = `img_${Date.now()}_${rowNumber}.jpg`;
             const uploadedName = await uploadToR2('products', compressedBuffer, fileName, 'image/jpeg');
             return { rowIndex: rowNumber, uploadKey: `products/${uploadedName}` };
-          })
-          .catch(err => {
+          } catch (err) {
             console.error(`Failed to process image at row ${rowNumber}:`, err);
             return { rowIndex: rowNumber, uploadKey: null };
-          });
+          }
+        })();
       } else {
         imagePromise = Promise.resolve({ rowIndex: rowNumber, uploadKey: null });
       }

@@ -214,6 +214,7 @@ export class CompanyRepository {
         pincode: true,
         logoImgPath: true,
         subdomain: true,
+        watermarkEnabled: true,
       },
     });
 
@@ -226,7 +227,15 @@ export class CompanyRepository {
       pincode: company.pincode,
       logo_img_path: company.logoImgPath,
       subdomain: company.subdomain || null,
+      watermark_enabled: company.watermarkEnabled,
     };
+  }
+
+  async updateWatermarkEnabled(userId: number, enabled: boolean): Promise<void> {
+    await prisma.company.updateMany({
+      where: { addedBy: BigInt(userId), isDeleted: false },
+      data: { watermarkEnabled: enabled },
+    });
   }
 
   async saveCompanySupportContactDetails(data: {

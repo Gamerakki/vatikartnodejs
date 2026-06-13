@@ -22,5 +22,6 @@ router.get('/fetch-support-contact-details', companyController.fetchCompanySuppo
 
 router.patch('/save-sales-contact-details', companyController.saveCompanySalesContactDetails);
 router.get('/fetch-sales-contact-details', companyController.fetchCompanySalesContactDetails);
+router.patch('/watermark', companyController.updateWatermark);
 
 export const companyRouter = router;

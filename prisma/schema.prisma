@@ -53,6 +53,7 @@ model Company {
   salesPhone   String?    @map("sales_phone") @db.VarChar(15)
   isDeleted    Boolean    @default(false) @map("is_deleted")
   subdomain    String?    @unique @map("subdomain") @db.VarChar(100)
+  watermarkEnabled Boolean @default(false) @map("watermark_enabled")
 
   // Relations
   addedByUser   User?     @relation("CompanyAddedBy", fields: [addedBy], references: [userId], onDelete: Cascade, onUpdate: Cascade)
@@ -304,5 +305,18 @@ model ProductSetComposition {
   product       Product @relation(fields: [productId], references: [productId], onDelete: Cascade)
 
   @@map("product_set_composition")
+}
+
+model AnalyticsEvent {
+  id          BigInt    @id @default(autoincrement())
+  companyId   BigInt    @map("company_id")
+  productId   BigInt?   @map("product_id")
+  eventType   String    @map("event_type") @db.VarChar(30) // VIEW, CART_ADD, VIEW_DURATION
+  eventValue  String?   @map("event_value") @db.VarChar(250)
+  addedDate   DateTime  @default(now()) @map("added_date") @db.Timestamptz
+
+  @@index([companyId, eventType])
+  @@index([productId])
+  @@map("analytics_events")
 }
 

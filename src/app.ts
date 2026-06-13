@@ -10,6 +10,7 @@ import { productRouter } from './modules/product/product.router';
 import { socialMediaRouter } from './modules/social_media_master/socialMedia.router';
 import { orderRouter } from './modules/order/order.router';
 import { adminRouter } from './modules/admin/admin.router';
+import { analyticsRouter } from './modules/analytics/analytics.router';
 
 const app = express();
 
@@ -73,6 +74,7 @@ app.use('/product', productRouter);
 app.use('/master', socialMediaRouter);
 app.use('/order', orderRouter);
 app.use('/admin', adminRouter);
+app.use('/analytics', analyticsRouter);
 
 // Global Error Handler
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
