@@ -6,6 +6,9 @@ import { validateAuth } from '../../middlewares/auth';
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
+// Public route to resolve subdomain
+router.get('/resolve-subdomain/:subdomain', companyController.resolveSubdomain);
+
 // All company routes require auth
 router.use(validateAuth);
 

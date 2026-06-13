@@ -1,15 +1,54 @@
 import { prisma } from '../../config/database';
 
 export class CompanyRepository {
+  async generateUniqueSubdomain(companyName: string, userId: bigint): Promise<string> {
+    const existingCompany = await prisma.company.findUnique({
+      where: { addedBy: userId },
+      select: { subdomain: true }
+    });
+    
+    if (existingCompany?.subdomain) {
+      return existingCompany.subdomain;
+    }
+
+    const slugBase = companyName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+    
+    const tempSlug = slugBase || 'company';
+    let unique = false;
+    let counter = 0;
+    let finalSlug = tempSlug;
+    
+    while (!unique) {
+      finalSlug = counter === 0 ? tempSlug : `${tempSlug}-${counter}`;
+      const conflict = await prisma.company.findUnique({
+        where: { subdomain: finalSlug }
+      });
+      if (!conflict) {
+        unique = true;
+      } else {
+        counter++;
+      }
+    }
+    
+    return finalSlug;
+  }
+
   async saveCompanyDirect(data: { companyName: string; addedBy: number }) {
+    const userIdBig = BigInt(data.addedBy);
+    const subdomain = await this.generateUniqueSubdomain(data.companyName, userIdBig);
+    
     return await prisma.company.upsert({
-      where: { addedBy: BigInt(data.addedBy) },
+      where: { addedBy: userIdBig },
       update: {
         companyName: data.companyName,
       },
       create: {
         companyName: data.companyName,
-        addedBy: BigInt(data.addedBy),
+        addedBy: userIdBig,
+        subdomain,
       },
     });
   }
@@ -23,6 +62,7 @@ export class CompanyRepository {
   }) {
     const userIdBig = BigInt(data.addedBy);
     const now = new Date();
+    const subdomain = await this.generateUniqueSubdomain(data.companyName, userIdBig);
 
     return await prisma.company.upsert({
       where: { addedBy: userIdBig },
@@ -40,8 +80,42 @@ export class CompanyRepository {
         pincode: data.pincode,
         addedBy: userIdBig,
         logoImgPath: data.logoImgPath || null,
+        subdomain,
       },
     });
+  }
+
+  async resolveSubdomain(subdomain: string) {
+    const company = await prisma.company.findUnique({
+      where: { subdomain },
+      select: {
+        companyId: true,
+        companyName: true,
+        logoImgPath: true,
+        catalogues: {
+          where: {
+            isDeleted: false,
+            isPublished: true,
+          },
+          orderBy: {
+            addedDate: 'desc',
+          },
+          take: 1,
+          select: {
+            catalogueId: true,
+          },
+        },
+      },
+    });
+
+    if (!company) return null;
+
+    return {
+      company_id: Number(company.companyId),
+      company_name: company.companyName,
+      logo_img_path: company.logoImgPath,
+      catalogue_id: company.catalogues.length > 0 ? Number(company.catalogues[0].catalogueId) : null,
+    };
   }
 
   async fetchCompanyLogoImgPath(loggedInUserId: number): Promise<string> {

@@ -51,6 +51,7 @@ model Company {
   salesEmail   String?    @map("sales_email") @db.VarChar(254)
   salesPhone   String?    @map("sales_phone") @db.VarChar(15)
   isDeleted    Boolean    @default(false) @map("is_deleted")
+  subdomain    String?    @unique @map("subdomain") @db.VarChar(100)
 
   // Relations
   addedByUser   User?     @relation("CompanyAddedBy", fields: [addedBy], references: [userId], onDelete: Cascade, onUpdate: Cascade)

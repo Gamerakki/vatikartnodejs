@@ -210,6 +210,39 @@ export class CompanyController {
       });
     }
   }
+
+  async resolveSubdomain(req: Request, res: Response): Promise<void> {
+    const { subdomain } = req.params;
+    if (!subdomain) {
+      res.status(400).json({
+        status: false,
+        msg: 'Subdomain is required',
+      });
+      return;
+    }
+
+    try {
+      const result = await companyService.resolveSubdomain(subdomain.toLowerCase().trim());
+      if (!result) {
+        res.status(404).json({
+          status: false,
+          msg: 'Company not found for this subdomain',
+        });
+        return;
+      }
+      res.status(200).json({
+        status: true,
+        msg: 'Subdomain resolved successfully',
+        data: result,
+      });
+    } catch (err) {
+      res.status(500).json({
+        status: false,
+        msg: 'An error occurred',
+        error: (err as Error).message,
+      });
+    }
+  }
 }
 
 export const companyController = new CompanyController();

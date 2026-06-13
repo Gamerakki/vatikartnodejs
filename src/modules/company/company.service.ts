@@ -126,6 +126,10 @@ export class CompanyService {
 
     return await companyRepository.fetchCompanySalesContactDetails(companyId);
   }
+
+  async resolveSubdomain(subdomain: string) {
+    return await companyRepository.resolveSubdomain(subdomain);
+  }
 }
 
 export const companyService = new CompanyService();
