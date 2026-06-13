@@ -20,16 +20,22 @@ export async function sendMerchantNotification(
 
     if (!user?.pushToken) return;
 
-    await fetch('https://exp.host/--/api/v2/push/send', {
+    const response = await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         to: user.pushToken,
+        channelId: 'default',
         sound: 'default',
         title,
         body,
       }),
     });
+
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => '');
+      console.warn('[notification] expo push rejected', response.status, responseText);
+    }
   } catch (err) {
     // Notification failure must never crash the main request
     console.warn('[notification] push failed', err);
