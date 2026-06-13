@@ -16,55 +16,55 @@ function csvCell(value: unknown): string {
   return `"${escaped}"`;
 }
 
-export class CatalogueController {
-  private async getExportCatalogueData(catalogueIdOrSlug: string) {
-    const numericId = Number(catalogueIdOrSlug);
-    const isNumeric = Number.isFinite(numericId) && numericId > 0;
+async function getExportCatalogueData(catalogueIdOrSlug: string) {
+  const numericId = Number(catalogueIdOrSlug);
+  const isNumeric = Number.isFinite(numericId) && numericId > 0;
 
-    const catalogue = await prisma.catalogue.findFirst({
-      where: isNumeric
-        ? { catalogueId: BigInt(numericId), isDeleted: false, isPublished: true }
-        : { slug: catalogueIdOrSlug, isDeleted: false, isPublished: true },
-      include: {
-        company: {
-          select: {
-            companyName: true,
-            logoImgPath: true,
-          },
+  const catalogue = await prisma.catalogue.findFirst({
+    where: isNumeric
+      ? { catalogueId: BigInt(numericId), isDeleted: false, isPublished: true }
+      : { slug: catalogueIdOrSlug, isDeleted: false, isPublished: true },
+    include: {
+      company: {
+        select: {
+          companyName: true,
+          logoImgPath: true,
         },
       },
-    });
+    },
+  });
 
-    if (!catalogue) {
-      throw new Error('Catalogue not found');
-    }
-
-    const products = await prisma.product.findMany({
-      where: {
-        catalogueId: catalogue.catalogueId,
-        companyId: catalogue.companyId,
-        isDeleted: false,
-      },
-      include: {
-        images: {
-          orderBy: { productImgId: 'asc' },
-          take: 1,
-        },
-      },
-      orderBy: { productId: 'desc' },
-    });
-
-    return {
-      title: catalogue.catalogue || 'Catalogue Export',
-      companyName: catalogue.company?.companyName || '',
-      logoUrl: toCdnUrl(catalogue.company?.logoImgPath || ''),
-      products,
-    };
+  if (!catalogue) {
+    throw new Error('Catalogue not found');
   }
 
+  const products = await prisma.product.findMany({
+    where: {
+      catalogueId: catalogue.catalogueId,
+      companyId: catalogue.companyId,
+      isDeleted: false,
+    },
+    include: {
+      images: {
+        orderBy: { productImgId: 'asc' },
+        take: 1,
+      },
+    },
+    orderBy: { productId: 'desc' },
+  });
+
+  return {
+    title: catalogue.catalogue || 'Catalogue Export',
+    companyName: catalogue.company?.companyName || '',
+    logoUrl: toCdnUrl(catalogue.company?.logoImgPath || ''),
+    products,
+  };
+}
+
+export class CatalogueController {
   async exportCataloguePdf(req: Request, res: Response): Promise<void> {
     try {
-      const payload = await this.getExportCatalogueData(req.params.catalogueId);
+      const payload = await getExportCatalogueData(req.params.catalogueId);
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', 'attachment; filename="catalogue-export.pdf"');
@@ -114,7 +114,7 @@ export class CatalogueController {
 
   async exportCatalogueExcel(req: Request, res: Response): Promise<void> {
     try {
-      const payload = await this.getExportCatalogueData(req.params.catalogueId);
+      const payload = await getExportCatalogueData(req.params.catalogueId);
       const lines: string[] = [];
 
       lines.push([
