@@ -149,6 +149,26 @@ export class UserController {
       });
     }
   }
+
+  async savePushToken(req: Request, res: Response): Promise<void> {
+    const userId: bigint = BigInt(res.locals.userId || 0);
+    const { pushToken } = req.body as { pushToken?: string };
+
+    if (!pushToken || typeof pushToken !== 'string' || !pushToken.startsWith('ExponentPushToken')) {
+      res.status(400).json({ status: false, msg: 'Invalid or missing pushToken' });
+      return;
+    }
+
+    try {
+      await (await import('../../config/database')).prisma.user.update({
+        where: { userId },
+        data: { pushToken },
+      });
+      res.status(200).json({ status: true, msg: 'Push token saved.' });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: 'An error occurred', error: (err as Error).message });
+    }
+  }
 }
 
 export const userController = new UserController();

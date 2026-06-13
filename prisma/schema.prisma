@@ -20,6 +20,7 @@ model User {
   lastActiveTime DateTime?  @map("last_active_time") @db.Timestamptz
   isAdmin        Boolean    @default(false) @map("is_admin")
   isDeleted      Boolean    @default(false) @map("is_deleted")
+  pushToken      String?    @map("push_token") @db.Text
 
   // Self relations
   creator        User?      @relation("UserToUser", fields: [addedBy], references: [userId], onDelete: Cascade, onUpdate: Cascade)

@@ -50,6 +50,23 @@ async function bootstrap() {
     socket.on('storefront_activity', (payload: StorefrontActivityPayload) => {
       if (!payload?.companyId) return;
       io.to(`company:${payload.companyId}`).emit('storefront_activity', payload);
+
+      // Fire-and-forget push notification to the merchant
+      void (async () => {
+        try {
+          const { getUserIdByCompanyId, sendMerchantNotification } = await import('./utils/notification');
+          const ownerId = await getUserIdByCompanyId(BigInt(payload.companyId));
+          if (ownerId) {
+            await sendMerchantNotification(
+              ownerId,
+              '👀 Live Visitor Alert',
+              `A buyer is currently browsing '${payload.label}'.`,
+            );
+          }
+        } catch {
+          // Notification failure must never crash the socket handler
+        }
+      })();
     });
   });
 

@@ -278,7 +278,7 @@ export class OrderRepository {
       throw new Error('Catalogue not found');
     }
 
-    return await prisma.$transaction(async (tx) => {
+    const orderResult = await prisma.$transaction(async (tx) => {
       // 1. Fetch products and check prices, slabs, MOQ, and GST
       const productIds = data.items.map((item) => BigInt(item.product_id));
       const dbProducts = await tx.product.findMany({
@@ -429,6 +429,28 @@ export class OrderRepository {
         total: Number(newOrder.total),
       };
     });
+
+    // Fire-and-forget: notify the merchant about the new order
+    const catalogueCompanyId = catalogue?.companyId;
+    if (catalogueCompanyId) {
+      void (async () => {
+        try {
+          const { getUserIdByCompanyId, sendMerchantNotification } = await import('../../utils/notification');
+          const ownerId = await getUserIdByCompanyId(catalogueCompanyId);
+          if (ownerId) {
+            await sendMerchantNotification(
+              ownerId,
+              '🎉 New Order Received!',
+              `Order #${orderResult.order_id} has been placed by ${data.customer_name}.`,
+            );
+          }
+        } catch {
+          // Notification failure must not surface to the caller
+        }
+      })();
+    }
+
+    return orderResult;
   }
 }
 

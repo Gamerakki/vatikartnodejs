@@ -11,5 +11,6 @@ router.get('/check-duplicate-username', validateOptionalAuth, userController.che
 
 // Authenticated route
 router.get('/validate-token', validateAuth, userController.validateToken);
+router.post('/push-token', validateAuth, userController.savePushToken);
 
 export const userRouter = router;

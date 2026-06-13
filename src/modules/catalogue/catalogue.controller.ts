@@ -651,6 +651,27 @@ export class CatalogueController {
 
     try {
       await catalogueService.createAccessRequest(catalogueId, phone, name);
+
+      // Fire-and-forget: notify the catalogue owner
+      void (async () => {
+        try {
+          const cat = await prisma.catalogue.findUnique({
+            where: { catalogueId: BigInt(catalogueId) },
+            select: { catalogue: true, company: { select: { addedBy: true } } },
+          });
+          if (cat?.company?.addedBy) {
+            const { sendMerchantNotification } = await import('../../utils/notification');
+            await sendMerchantNotification(
+              cat.company.addedBy,
+              '🔒 Catalogue Access Request',
+              `${name} has requested access to view "${cat.catalogue || 'your catalogue'}".`,
+            );
+          }
+        } catch {
+          // Notification failure must not surface to the caller
+        }
+      })();
+
       res.status(200).json({ status: true, msg: 'Request submitted successfully' });
     } catch (err) {
       res.status(500).json({ status: false, msg: (err as Error).message });
