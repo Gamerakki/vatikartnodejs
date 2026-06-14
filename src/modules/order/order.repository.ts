@@ -30,6 +30,50 @@ function getServerItemPrice(
 }
 
 export class OrderRepository {
+  async fetchPublicOrdersByCustomerPhone(phone: string): Promise<any[]> {
+    const normalizedPhone = phone.replace(/\s+/g, '');
+
+    const orders = await prisma.order.findMany({
+      where: {
+        customerPhone: normalizedPhone,
+      },
+      include: {
+        items: {
+          where: {
+            deletedByCustomer: false,
+          },
+        },
+      },
+      orderBy: {
+        addedDate: 'desc',
+      },
+    });
+
+    return orders.map((order) => {
+      const subtotal = Number(order.subtotal);
+      const discount = Number(order.discount);
+      const shipping = Number(order.shipping);
+      const total = Number(order.total);
+      const computedTax = Number((total - subtotal + discount - shipping).toFixed(2));
+
+      return {
+        orderId: order.orderId.toString(),
+        status: order.status as OrderStatus,
+        subtotal,
+        tax: computedTax,
+        total,
+        addedDate: order.addedDate.toISOString(),
+        items: order.items.map((item) => ({
+          id: item.itemId.toString(),
+          title: item.title,
+          sku: item.sku,
+          qty: item.qty,
+          price: Number(item.price),
+        })),
+      };
+    });
+  }
+
   async fetchOrdersByCompany(companyId: number): Promise<OrderItemRes[]> {
     const orders = await prisma.order.findMany({
       where: {

@@ -8,6 +8,34 @@ import {
 } from './order.validation';
 
 export class OrderController {
+  async fetchPublicOrdersByCustomerPhone(req: Request, res: Response): Promise<void> {
+    const phone = String(req.params.phone || '').trim();
+
+    if (!phone) {
+      res.status(400).json({
+        status: false,
+        msg: 'An error occurred',
+        error: 'Invalid customer phone',
+      });
+      return;
+    }
+
+    try {
+      const orders = await orderService.fetchPublicOrdersByCustomerPhone(phone);
+      res.status(200).json({
+        status: true,
+        msg: 'Customer orders fetched successfully!',
+        data: orders,
+      });
+    } catch (err) {
+      res.status(500).json({
+        status: false,
+        msg: 'An error occurred',
+        error: (err as Error).message,
+      });
+    }
+  }
+
   async fetchOrders(req: Request, res: Response): Promise<void> {
     const loggedInUserId = res.locals.userId || 0;
 

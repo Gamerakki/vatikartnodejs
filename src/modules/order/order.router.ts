@@ -6,6 +6,7 @@ const router = Router();
 
 // Public order booking (does not require auth)
 router.post('/public/book', orderController.bookOrder);
+router.get('/public/customer/:phone', orderController.fetchPublicOrdersByCustomerPhone);
 
 // All other order routes require auth
 router.use(validateAuth);

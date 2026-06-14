@@ -3,6 +3,10 @@ import { companyRepository } from '../company/company.repository';
 import { OrderItemRes, OrderDetailRes, OrderStatus } from './order.interface';
 
 export class OrderService {
+  async fetchPublicOrdersByCustomerPhone(phone: string): Promise<any[]> {
+    return await orderRepository.fetchPublicOrdersByCustomerPhone(phone);
+  }
+
   async fetchOrdersByUserId(userId: number): Promise<OrderItemRes[]> {
     const companyId = await companyRepository.fetchCompanyIDViaUserId(userId);
     if (!companyId) {
