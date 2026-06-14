@@ -716,6 +716,27 @@ export class CatalogueController {
     }
   }
 
+  async approveAllAccessRequests(req: Request, res: Response): Promise<void> {
+    const loggedInUserId = res.locals.userId || 0;
+    const catalogueId = parseInt(req.params.catalogueId, 10);
+
+    if (isNaN(catalogueId)) {
+      res.status(400).json({ status: false, msg: 'Invalid catalogueId' });
+      return;
+    }
+
+    try {
+      const updatedCount = await catalogueService.approveAllAccessRequests(loggedInUserId, catalogueId);
+      res.status(200).json({
+        status: true,
+        msg: 'All pending requests approved successfully',
+        data: { updatedCount },
+      });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
   async cloneCatalogue(req: Request, res: Response): Promise<void> {
     const loggedInUserId = res.locals.userId || 0;
     const catalogueId = parseInt(req.params.catalogue_id, 10);

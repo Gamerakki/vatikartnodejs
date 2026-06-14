@@ -25,6 +25,7 @@ router.patch('/privacy/:catalogue_id', catalogueController.updateCataloguePrivac
 
 router.get('/access-requests', catalogueController.fetchAccessRequests);
 router.patch('/access-request/:access_id', catalogueController.updateAccessRequest);
+router.patch('/access-request/approve-all/:catalogueId', catalogueController.approveAllAccessRequests);
 
 router.get('/fetch-deleted-list', catalogueController.fetchDeletedCatalogues);
 router.get('/fetch-deleted-data/:catalogue_id', catalogueController.fetchDeletedCatalogueData);

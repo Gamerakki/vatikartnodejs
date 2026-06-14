@@ -462,6 +462,23 @@ export class CatalogueRepository {
     });
   }
 
+  async approveAllAccessRequests(catalogueId: number, companyId: number): Promise<number> {
+    const result = await prisma.customerAccessRequest.updateMany({
+      where: {
+        catalogueId: BigInt(catalogueId),
+        status: 'PENDING',
+        catalogue: {
+          companyId: BigInt(companyId),
+        },
+      },
+      data: {
+        status: 'APPROVED',
+      },
+    });
+
+    return result.count;
+  }
+
   async updateCataloguePrivacy(catalogueId: number, companyId: number, privacyLevel: string): Promise<void> {
     const exists = await prisma.catalogue.findFirst({
       where: { catalogueId: BigInt(catalogueId), companyId: BigInt(companyId) }

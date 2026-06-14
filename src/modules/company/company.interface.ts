@@ -19,6 +19,7 @@ export interface CompanyData {
   address: string | null;
   pincode: string | null;
   logo_img_path: string | null;
+  policies?: string | null;
 }
 
 export interface SaveCompanySupportContactDetailsReq {

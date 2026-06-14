@@ -197,6 +197,11 @@ export class CatalogueService {
     await catalogueRepository.updateAccessRequest(accessId, companyId, status, expiresAt);
   }
 
+  async approveAllAccessRequests(loggedInUserId: number, catalogueId: number): Promise<number> {
+    const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
+    return await catalogueRepository.approveAllAccessRequests(catalogueId, companyId);
+  }
+
   async updateCataloguePrivacy(loggedInUserId: number, catalogueId: number, privacyLevel: string): Promise<void> {
     const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
     await catalogueRepository.updateCataloguePrivacy(catalogueId, companyId, privacyLevel);

@@ -261,6 +261,49 @@ export class CompanyController {
       res.status(500).json({ status: false, msg: 'An error occurred', error: (err as Error).message });
     }
   }
+
+  async fetchCompanyPolicies(req: Request, res: Response): Promise<void> {
+    const loggedInUserId = res.locals.userId || 0;
+
+    try {
+      const data = await companyService.fetchCompanyPolicies(loggedInUserId);
+      res.status(200).json({
+        status: true,
+        msg: 'Company policies fetched successfully!',
+        data,
+      });
+    } catch (err) {
+      res.status(500).json({
+        status: false,
+        msg: 'An error occurred',
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  async updateCompanyPolicies(req: Request, res: Response): Promise<void> {
+    const loggedInUserId = res.locals.userId || 0;
+    const { policies } = req.body as { policies?: string | null };
+
+    if (policies != null && typeof policies !== 'string') {
+      res.status(400).json({ status: false, msg: 'policies must be a string or null' });
+      return;
+    }
+
+    try {
+      await companyService.updateCompanyPolicies(loggedInUserId, policies ?? null);
+      res.status(200).json({
+        status: true,
+        msg: 'Company policies updated successfully!',
+      });
+    } catch (err) {
+      res.status(500).json({
+        status: false,
+        msg: 'An error occurred',
+        error: (err as Error).message,
+      });
+    }
+  }
 }
 
 export const companyController = new CompanyController();

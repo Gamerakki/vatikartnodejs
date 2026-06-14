@@ -130,6 +130,25 @@ export class CompanyService {
   async resolveSubdomain(subdomain: string) {
     return await companyRepository.resolveSubdomain(subdomain);
   }
+
+  async fetchCompanyPolicies(loggedInUserId: number): Promise<{ policies: string | null }> {
+    const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
+    if (!companyId) {
+      return { policies: null };
+    }
+
+    return await companyRepository.fetchCompanyPolicies(companyId);
+  }
+
+  async updateCompanyPolicies(loggedInUserId: number, policies: string | null): Promise<void> {
+    const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
+    if (!companyId) {
+      throw new Error('Please add your company details first');
+    }
+
+    const normalized = typeof policies === 'string' ? policies.trim() : '';
+    await companyRepository.updateCompanyPolicies(companyId, normalized || null, loggedInUserId);
+  }
 }
 
 export const companyService = new CompanyService();

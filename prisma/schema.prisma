@@ -51,6 +51,7 @@ model Company {
   supportPhone String?    @map("support_phone") @db.VarChar(15)
   salesEmail   String?    @map("sales_email") @db.VarChar(254)
   salesPhone   String?    @map("sales_phone") @db.VarChar(15)
+  policies     String?    @db.Text
   isDeleted    Boolean    @default(false) @map("is_deleted")
   subdomain    String?    @unique @map("subdomain") @db.VarChar(100)
   watermarkEnabled Boolean @default(false) @map("watermark_enabled")
