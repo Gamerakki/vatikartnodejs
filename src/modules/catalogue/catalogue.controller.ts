@@ -596,6 +596,9 @@ export class CatalogueController {
         bannerText: result.bannerText ?? null,
         bannerActive: result.bannerActive ?? false,
         bannerImgPath: result.bannerImgPath ?? null,
+        wholesalePricingApplied: result.wholesalePricingApplied ?? false,
+        wholesaleGroupName: result.wholesaleGroupName ?? null,
+        catalogShareTemplate: result.catalogShareTemplate ?? null,
         data: result.products,
       });
     } catch (err) {

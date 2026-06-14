@@ -64,6 +64,8 @@ model Company {
   products           Product[]
   orders             Order[]
   subscription       Subscription?
+  customerGroups     CustomerGroup[]
+  whatsappTemplate   WhatsAppTemplate?
 
   @@map("company")
 }
@@ -156,6 +158,7 @@ model Product {
   variantOptions ProductVariantOption[]
   orderItems     OrderItem[]
   setCompositions ProductSetComposition[]
+  groupPrices    GroupPrice[]
 
   @@map("products")
 }
@@ -270,9 +273,11 @@ model CatalogueVisitorMapper {
   id          BigInt    @id @default(autoincrement())
   catalogueId BigInt    @map("catalogue_id")
   customerId  BigInt    @map("customer_id")
+  groupId     BigInt?   @map("group_id")
   visitedAt   DateTime  @default(now()) @map("visited_at") @db.Timestamptz
 
   catalogue   Catalogue @relation(fields: [catalogueId], references: [catalogueId], onDelete: Cascade)
+  group       CustomerGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
   @@map("catalogue_visitor_mapper")
 }
@@ -282,12 +287,14 @@ model CustomerAccessRequest {
   catalogueId   BigInt    @map("catalogue_id")
   customerPhone String    @map("customer_phone") @db.VarChar(20)
   customerName  String?   @map("customer_name") @db.VarChar(100)
+  groupId       BigInt?   @map("group_id")
   status        String    @default("PENDING") @db.VarChar(20) // PENDING, APPROVED, REJECTED
   expiresAt     DateTime? @map("expires_at") @db.Timestamptz
   requestedAt   DateTime  @default(now()) @map("requested_at") @db.Timestamptz
   updatedAt     DateTime? @updatedAt @map("updated_at") @db.Timestamptz
 
   catalogue     Catalogue @relation(fields: [catalogueId], references: [catalogueId], onDelete: Cascade)
+  group         CustomerGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
   @@unique([catalogueId, customerPhone])
   @@map("customer_access_requests")
@@ -318,5 +325,59 @@ model AnalyticsEvent {
   @@index([companyId, eventType])
   @@index([productId])
   @@map("analytics_events")
+}
+
+model CustomerGroup {
+  id          BigInt    @id @default(autoincrement()) @map("group_id")
+  name        String    @db.VarChar(50)
+  description String?   @db.Text
+  companyId   BigInt    @map("company_id")
+
+  company     Company   @relation(fields: [companyId], references: [companyId], onDelete: Cascade)
+  prices      GroupPrice[]
+  members     CustomerGroupMember[]
+  accessRequests CustomerAccessRequest[]
+  visitors    CatalogueVisitorMapper[]
+
+  @@unique([companyId, name])
+  @@map("customer_groups")
+}
+
+model CustomerGroupMember {
+  id            BigInt    @id @default(autoincrement()) @map("member_id")
+  groupId       BigInt    @map("group_id")
+  customerPhone String    @map("customer_phone") @db.VarChar(20)
+  customerName  String?   @map("customer_name") @db.VarChar(100)
+  addedDate     DateTime  @default(now()) @map("added_date") @db.Timestamptz
+
+  group         CustomerGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, customerPhone])
+  @@index([customerPhone])
+  @@map("customer_group_members")
+}
+
+model GroupPrice {
+  id          BigInt   @id @default(autoincrement()) @map("price_id")
+  groupId     BigInt   @map("group_id")
+  productId   BigInt   @map("product_id")
+  customPrice Decimal  @map("custom_price") @db.Decimal(12, 2)
+
+  group       CustomerGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  product     Product       @relation(fields: [productId], references: [productId], onDelete: Cascade)
+
+  @@unique([groupId, productId])
+  @@map("group_prices")
+}
+
+model WhatsAppTemplate {
+  id               BigInt   @id @default(autoincrement())
+  companyId        BigInt   @unique @map("company_id")
+  catalogShareText String   @default("Check out our catalog: {link}") @map("catalog_share_text") @db.Text
+  orderConfirmText String   @default("Your order {order_id} of total {total} is confirmed!") @map("order_confirm_text") @db.Text
+
+  company          Company  @relation(fields: [companyId], references: [companyId], onDelete: Cascade)
+
+  @@map("whatsapp_templates")
 }
 

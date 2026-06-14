@@ -1,6 +1,8 @@
 import { catalogueRepository } from './catalogue.repository';
 import { companyRepository } from '../company/company.repository';
 import { productRepository } from '../product/product.repository';
+import { customerGroupService } from '../customer-group/customerGroup.service';
+import { whatsappTemplateService } from '../whatsapp-template/whatsappTemplate.service';
 import { SaveCatalogueReq, SaveCatalogueRes, CatalogRes, CatalogueQueryParams, SoftDeleteRestoreCatalogueReq } from './catalogue.interface';
 import { sanitizeString, generateRandom12DigitString } from '../../utils/common';
 
@@ -141,12 +143,42 @@ export class CatalogueService {
     }
 
     const products = await productRepository.fetchProductsByCatalogue(targetId, catalogue.companyId);
+    const catalogShareTemplate = await whatsappTemplateService.fetchPublicCatalogueTemplate(catalogue.companyId);
+
+    let wholesalePricingApplied = false;
+    let wholesaleGroupName: string | null = null;
+
+    if (customerPhone) {
+      const group = await customerGroupService.resolveGroupForPublicCustomer(catalogue.companyId, customerPhone);
+      if (group) {
+        const priceMap = await customerGroupService.fetchPriceMapForGroup(
+          group.id,
+          products.map((product) => product.product_id),
+        );
+
+        products.forEach((product) => {
+          const customPrice = priceMap.get(product.product_id);
+          if (customPrice !== undefined) {
+            product.price = customPrice;
+            wholesalePricingApplied = true;
+          }
+        });
+
+        if (wholesalePricingApplied) {
+          wholesaleGroupName = group.name;
+        }
+      }
+    }
+
     return {
       title: catalogue.title,
       privacyLevel: catalogue.privacyLevel,
       bannerText: catalogue.bannerText,
       bannerActive: catalogue.bannerActive,
       bannerImgPath: catalogue.bannerImgPath,
+      wholesalePricingApplied,
+      wholesaleGroupName,
+      catalogShareTemplate,
       products,
     };
   }
