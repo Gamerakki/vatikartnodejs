@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import path from 'path';
+import compression from 'compression';
 import { logger } from './config/logger';
 import { userActivityMiddleware } from './middlewares/userActivity';
 import { userRouter } from './modules/user/user.router';
@@ -15,6 +16,9 @@ import { customerGroupRouter } from './modules/customer-group/customerGroup.rout
 import { whatsappTemplateRouter } from './modules/whatsapp-template/whatsappTemplate.router';
 
 const app = express();
+
+// Enable Gzip compression to reduce API payload weights (often by 70%+)
+app.use(compression());
 
 // Set up CORS configurations mirroring the Go backend
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',');
