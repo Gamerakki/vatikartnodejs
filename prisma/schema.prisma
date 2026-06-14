@@ -235,6 +235,7 @@ model Order {
   company         Company     @relation(fields: [companyId], references: [companyId], onDelete: Cascade)
   items           OrderItem[]
 
+  @@index([companyId, addedDate])
   @@map("orders")
 }
 
@@ -297,6 +298,7 @@ model CustomerAccessRequest {
   group         CustomerGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
   @@unique([catalogueId, customerPhone])
+  @@index([catalogueId, customerPhone])
   @@map("customer_access_requests")
 }
 

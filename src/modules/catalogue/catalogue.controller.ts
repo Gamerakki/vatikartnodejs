@@ -234,6 +234,7 @@ export class CatalogueController {
   async exportCataloguePdf(req: Request, res: Response): Promise<void> {
     try {
       const payload = await getExportCatalogueData(req.params.catalogueId);
+      payload.products = payload.products.slice(0, 150);
       const theme = normalizePdfTheme(String(req.query.theme || 'corporate'));
       const columns = Number(req.query.columns) === 2 ? 2 : 1;
       const tokens = getPdfThemeTokens(theme);

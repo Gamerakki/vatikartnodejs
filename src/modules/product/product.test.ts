@@ -35,9 +35,9 @@ describe('ProductService', () => {
         99,
         10,
         [
-          { optionType: 'size', label: 'M', accent: null, sortOrder: 1 },
-          { optionType: 'size', label: 'L', accent: null, sortOrder: 2 },
-          { optionType: 'color', label: 'Red', accent: '#ff0000', sortOrder: 1 }
+          { optionType: 'size', label: 'M', accent: null, sortOrder: 1, isSet: false, setQuantity: 1 },
+          { optionType: 'size', label: 'L', accent: null, sortOrder: 2, isSet: false, setQuantity: 1 },
+          { optionType: 'color', label: 'Red', accent: '#ff0000', sortOrder: 1, isSet: false, setQuantity: 1 }
         ]
       );
     });
