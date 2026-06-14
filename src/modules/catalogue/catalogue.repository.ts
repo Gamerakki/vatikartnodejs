@@ -535,11 +535,7 @@ export class CatalogueRepository {
       include: {
         images: true,
         bulkDiscounts: true,
-        variantOptions: {
-          include: {
-            inventories: true,
-          },
-        },
+        variantOptions: true,
       },
     });
 
@@ -608,6 +604,7 @@ export class CatalogueRepository {
           });
         }
 
+        const optionMap = new Map<string, bigint>();
         for (const opt of p.variantOptions) {
           const newOpt = await tx.productVariantOption.create({
             data: {
@@ -618,16 +615,23 @@ export class CatalogueRepository {
               sortOrder: opt.sortOrder,
             },
           });
+          optionMap.set(opt.optionId.toString(), newOpt.optionId);
+        }
 
-          if (opt.inventories.length > 0) {
-            await tx.productVariantInventory.createMany({
-              data: opt.inventories.map((inv) => ({
-                productId: newProd.productId,
-                optionId: newOpt.optionId,
-                quantity: inv.quantity,
-              })),
-            });
-          }
+        const oldInventories = await tx.productVariantInventory.findMany({
+          where: { productId: p.productId },
+        });
+
+        if (oldInventories.length > 0) {
+          await tx.productVariantInventory.createMany({
+            data: oldInventories.map((inv) => ({
+              productId: newProd.productId,
+              sizeOptionId: inv.sizeOptionId ? (optionMap.get(inv.sizeOptionId.toString()) || null) : null,
+              colorOptionId: inv.colorOptionId ? (optionMap.get(inv.colorOptionId.toString()) || null) : null,
+              quantity: inv.quantity,
+              sku: inv.sku,
+            })),
+          });
         }
       }
 

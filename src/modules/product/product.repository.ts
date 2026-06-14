@@ -46,9 +46,6 @@ export class ProductRepository {
           orderBy: { productImgId: 'asc' },
         },
         variantOptions: {
-          include: {
-            inventories: true,
-          },
           orderBy: [{ sortOrder: 'asc' }, { optionId: 'asc' }],
         },
         bulkDiscounts: {
@@ -59,14 +56,45 @@ export class ProductRepository {
       orderBy: { productId: 'desc' },
     });
 
+    const stockByProduct = new Map<string, number>();
+    const inventoryRowsByProduct = new Map<string, Array<{ sizeOptionId: bigint | null; colorOptionId: bigint | null; quantity: number }>>();
+    if (products.length > 0) {
+      const stockRows = await prisma.productVariantInventory.groupBy({
+        by: ['productId'],
+        where: { productId: { in: products.map((p) => p.productId) } },
+        _sum: { quantity: true },
+      });
+      stockRows.forEach((row) => {
+        stockByProduct.set(row.productId.toString(), row._sum.quantity || 0);
+      });
+
+      const inventoryRows = await prisma.productVariantInventory.findMany({
+        where: { productId: { in: products.map((p) => p.productId) } },
+      });
+      inventoryRows.forEach((row) => {
+        const key = row.productId.toString();
+        const existing = inventoryRowsByProduct.get(key) || [];
+        existing.push({ sizeOptionId: row.sizeOptionId, colorOptionId: row.colorOptionId, quantity: row.quantity });
+        inventoryRowsByProduct.set(key, existing);
+      });
+    }
+
     return products.map((p) => {
       const sizesOptions = p.variantOptions.filter((o) => o.optionType === 'size');
       const colorsOptions = p.variantOptions.filter((o) => o.optionType === 'color');
 
-      let totalStock = 0;
-      sizesOptions.forEach((o) => {
-        const qty = o.inventories.reduce((sum, inv) => sum + inv.quantity, 0);
-        totalStock += qty;
+      const totalStock = stockByProduct.get(p.productId.toString()) || 0;
+      const inventoryRows = inventoryRowsByProduct.get(p.productId.toString()) || [];
+      const inventoryItems = inventoryRows.map((row) => {
+        const sizeOption = row.sizeOptionId ? sizesOptions.find((opt) => opt.optionId.toString() === row.sizeOptionId?.toString()) : null;
+        const colorOption = row.colorOptionId ? colorsOptions.find((opt) => opt.optionId.toString() === row.colorOptionId?.toString()) : null;
+        return {
+          size_option_id: row.sizeOptionId ? Number(row.sizeOptionId) : null,
+          color_option_id: row.colorOptionId ? Number(row.colorOptionId) : null,
+          size_label: sizeOption?.label || null,
+          color_label: colorOption?.label || null,
+          quantity: row.quantity,
+        };
       });
 
       return {
@@ -99,6 +127,7 @@ export class ProductRepository {
           set_quantity: o.setQuantity,
           sort_order: o.sortOrder,
         })),
+        inventory_items: inventoryItems,
         bulk_discounts: p.bulkDiscounts.map((d) => ({
           slab_id: Number(d.slabId),
           min_qty: d.minQty,
@@ -134,9 +163,6 @@ export class ProductRepository {
           orderBy: { productImgId: 'asc' },
         },
         variantOptions: {
-          include: {
-            inventories: true,
-          },
           orderBy: [{ sortOrder: 'asc' }, { optionId: 'asc' }],
         },
         bulkDiscounts: {
@@ -147,14 +173,45 @@ export class ProductRepository {
       orderBy: { productId: 'desc' },
     });
 
+    const stockByProduct = new Map<string, number>();
+    const inventoryRowsByProduct = new Map<string, Array<{ sizeOptionId: bigint | null; colorOptionId: bigint | null; quantity: number }>>();
+    if (products.length > 0) {
+      const stockRows = await prisma.productVariantInventory.groupBy({
+        by: ['productId'],
+        where: { productId: { in: products.map((p) => p.productId) } },
+        _sum: { quantity: true },
+      });
+      stockRows.forEach((row) => {
+        stockByProduct.set(row.productId.toString(), row._sum.quantity || 0);
+      });
+
+      const inventoryRows = await prisma.productVariantInventory.findMany({
+        where: { productId: { in: products.map((p) => p.productId) } },
+      });
+      inventoryRows.forEach((row) => {
+        const key = row.productId.toString();
+        const existing = inventoryRowsByProduct.get(key) || [];
+        existing.push({ sizeOptionId: row.sizeOptionId, colorOptionId: row.colorOptionId, quantity: row.quantity });
+        inventoryRowsByProduct.set(key, existing);
+      });
+    }
+
     return products.map((p) => {
       const sizesOptions = p.variantOptions.filter((o) => o.optionType === 'size');
       const colorsOptions = p.variantOptions.filter((o) => o.optionType === 'color');
 
-      let totalStock = 0;
-      sizesOptions.forEach((o) => {
-        const qty = o.inventories.reduce((sum, inv) => sum + inv.quantity, 0);
-        totalStock += qty;
+      const totalStock = stockByProduct.get(p.productId.toString()) || 0;
+      const inventoryRows = inventoryRowsByProduct.get(p.productId.toString()) || [];
+      const inventoryItems = inventoryRows.map((row) => {
+        const sizeOption = row.sizeOptionId ? sizesOptions.find((opt) => opt.optionId.toString() === row.sizeOptionId?.toString()) : null;
+        const colorOption = row.colorOptionId ? colorsOptions.find((opt) => opt.optionId.toString() === row.colorOptionId?.toString()) : null;
+        return {
+          size_option_id: row.sizeOptionId ? Number(row.sizeOptionId) : null,
+          color_option_id: row.colorOptionId ? Number(row.colorOptionId) : null,
+          size_label: sizeOption?.label || null,
+          color_label: colorOption?.label || null,
+          quantity: row.quantity,
+        };
       });
 
       return {
@@ -187,6 +244,7 @@ export class ProductRepository {
           set_quantity: o.setQuantity,
           sort_order: o.sortOrder,
         })),
+        inventory_items: inventoryItems,
         bulk_discounts: p.bulkDiscounts.map((d) => ({
           slab_id: Number(d.slabId),
           min_qty: d.minQty,
@@ -353,7 +411,7 @@ export class ProductRepository {
   async saveInventory(
     productId: number,
     companyId: number,
-    items: { optionId: number; quantity: number }[]
+    items: { sizeOptionId?: number | null; colorOptionId?: number | null; quantity: number }[]
   ) {
     const productIdBig = BigInt(productId);
     const companyIdBig = BigInt(companyId);
@@ -376,26 +434,57 @@ export class ProductRepository {
         return;
       }
 
-      const optionIDs = items.map((i) => BigInt(i.optionId));
+      const sizeIDs = Array.from(
+        new Set(
+          items
+            .map((i) => i.sizeOptionId)
+            .filter((id): id is number => Number.isFinite(id as number) && (id as number) > 0)
+            .map((id) => BigInt(id))
+        )
+      );
+      const colorIDs = Array.from(
+        new Set(
+          items
+            .map((i) => i.colorOptionId)
+            .filter((id): id is number => Number.isFinite(id as number) && (id as number) > 0)
+            .map((id) => BigInt(id))
+        )
+      );
 
-      // Validate option types (must exist and be type "size")
-      const validCount = await tx.productVariantOption.count({
-        where: {
-          productId: productIdBig,
-          optionType: 'size',
-          optionId: { in: optionIDs },
-        },
-      });
+      if (sizeIDs.length > 0) {
+        const validSizeCount = await tx.productVariantOption.count({
+          where: {
+            productId: productIdBig,
+            optionType: 'size',
+            optionId: { in: sizeIDs },
+          },
+        });
 
-      if (validCount !== items.length) {
-        throw new Error('invalid size option');
+        if (validSizeCount !== sizeIDs.length) {
+          throw new Error('invalid variant option');
+        }
+      }
+
+      if (colorIDs.length > 0) {
+        const validColorCount = await tx.productVariantOption.count({
+          where: {
+            productId: productIdBig,
+            optionType: 'color',
+            optionId: { in: colorIDs },
+          },
+        });
+
+        if (validColorCount !== colorIDs.length) {
+          throw new Error('invalid variant option');
+        }
       }
 
       // Save inventories
       await tx.productVariantInventory.createMany({
         data: items.map((item) => ({
           productId: productIdBig,
-          optionId: BigInt(item.optionId),
+          sizeOptionId: item.sizeOptionId ? BigInt(item.sizeOptionId) : null,
+          colorOptionId: item.colorOptionId ? BigInt(item.colorOptionId) : null,
           quantity: item.quantity,
         })),
       });
@@ -411,22 +500,79 @@ export class ProductRepository {
       throw new Error('product not found');
     }
 
-    const rows = await prisma.$queryRaw<any[]>`
-      SELECT 
-        pvo.option_id, 
-        pvo.label, 
-        COALESCE(pvi.quantity, 0)::int as quantity
-      FROM product_variant_options pvo
-      LEFT JOIN product_variant_inventories pvi ON pvi.option_id = pvo.option_id AND pvi.product_id = pvo.product_id
-      WHERE pvo.product_id = ${BigInt(productId)} AND pvo.option_type = 'size'
-      ORDER BY pvo.sort_order ASC, pvo.option_id ASC
-    `;
+    const productIdBig = BigInt(productId);
+    const [sizeOptions, colorOptions, inventories] = await Promise.all([
+      prisma.productVariantOption.findMany({
+        where: { productId: productIdBig, optionType: 'size' },
+        orderBy: [{ sortOrder: 'asc' }, { optionId: 'asc' }],
+      }),
+      prisma.productVariantOption.findMany({
+        where: { productId: productIdBig, optionType: 'color' },
+        orderBy: [{ sortOrder: 'asc' }, { optionId: 'asc' }],
+      }),
+      prisma.productVariantInventory.findMany({
+        where: { productId: productIdBig },
+      }),
+    ]);
 
-    return rows.map((r) => ({
-      option_id: Number(r.option_id),
-      label: r.label,
-      quantity: Number(r.quantity),
-    }));
+    const inventoryByCombo = new Map<string, number>();
+    inventories.forEach((inv) => {
+      const key = `${inv.sizeOptionId ? inv.sizeOptionId.toString() : 'null'}:${inv.colorOptionId ? inv.colorOptionId.toString() : 'null'}`;
+      inventoryByCombo.set(key, (inventoryByCombo.get(key) || 0) + inv.quantity);
+    });
+
+    const combinations: Array<{
+      size_option_id: number | null;
+      color_option_id: number | null;
+      size_label: string | null;
+      color_label: string | null;
+      quantity: number;
+    }> = [];
+
+    if (sizeOptions.length > 0 && colorOptions.length > 0) {
+      sizeOptions.forEach((size) => {
+        colorOptions.forEach((color) => {
+          const key = `${size.optionId.toString()}:${color.optionId.toString()}`;
+          combinations.push({
+            size_option_id: Number(size.optionId),
+            color_option_id: Number(color.optionId),
+            size_label: size.label,
+            color_label: color.label,
+            quantity: inventoryByCombo.get(key) || 0,
+          });
+        });
+      });
+      return combinations;
+    }
+
+    if (sizeOptions.length > 0) {
+      sizeOptions.forEach((size) => {
+        const key = `${size.optionId.toString()}:null`;
+        combinations.push({
+          size_option_id: Number(size.optionId),
+          color_option_id: null,
+          size_label: size.label,
+          color_label: null,
+          quantity: inventoryByCombo.get(key) || 0,
+        });
+      });
+      return combinations;
+    }
+
+    if (colorOptions.length > 0) {
+      colorOptions.forEach((color) => {
+        const key = `null:${color.optionId.toString()}`;
+        combinations.push({
+          size_option_id: null,
+          color_option_id: Number(color.optionId),
+          size_label: null,
+          color_label: color.label,
+          quantity: inventoryByCombo.get(key) || 0,
+        });
+      });
+    }
+
+    return combinations;
   }
 
   async fetchInventoryList(companyId: number): Promise<any[]> {
@@ -438,20 +584,26 @@ export class ProductRepository {
       include: {
         variantOptions: {
           where: { optionType: 'size' },
-          include: {
-            inventories: true,
-          },
           orderBy: [{ sortOrder: 'asc' }, { optionId: 'asc' }],
         },
       },
       orderBy: { product: 'asc' },
     });
 
-    return products.map((p) => {
-      let totalStock = 0;
-      p.variantOptions.forEach((o) => {
-        totalStock += o.inventories.reduce((sum, inv) => sum + inv.quantity, 0);
+    const stockByProduct = new Map<string, number>();
+    if (products.length > 0) {
+      const stockRows = await prisma.productVariantInventory.groupBy({
+        by: ['productId'],
+        where: { productId: { in: products.map((p) => p.productId) } },
+        _sum: { quantity: true },
       });
+      stockRows.forEach((row) => {
+        stockByProduct.set(row.productId.toString(), row._sum.quantity || 0);
+      });
+    }
+
+    return products.map((p) => {
+      const totalStock = stockByProduct.get(p.productId.toString()) || 0;
 
       let status: 'OUT_OF_STOCK' | 'LOW_STOCK' | 'IN_STOCK' = 'IN_STOCK';
       if (totalStock === 0) {
@@ -483,12 +635,21 @@ export class ProductRepository {
       include: {
         variantOptions: {
           where: { optionType: 'size' },
-          include: {
-            inventories: true,
-          },
         },
       },
     });
+
+    const stockByProduct = new Map<string, number>();
+    if (products.length > 0) {
+      const stockRows = await prisma.productVariantInventory.groupBy({
+        by: ['productId'],
+        where: { productId: { in: products.map((p) => p.productId) } },
+        _sum: { quantity: true },
+      });
+      stockRows.forEach((row) => {
+        stockByProduct.set(row.productId.toString(), row._sum.quantity || 0);
+      });
+    }
 
     let totalItems = 0;
     let totalQuantity = 0;
@@ -497,10 +658,7 @@ export class ProductRepository {
 
     products.forEach((p) => {
       totalItems += 1;
-      let totalStock = 0;
-      p.variantOptions.forEach((o) => {
-        totalStock += o.inventories.reduce((sum, inv) => sum + inv.quantity, 0);
-      });
+      const totalStock = stockByProduct.get(p.productId.toString()) || 0;
 
       totalQuantity += totalStock;
 
@@ -528,8 +686,7 @@ export class ProductRepository {
       where: { productId: prodBig, companyId: compBig, isDeleted: false },
       include: {
         variantOptions: {
-          where: { optionType: 'size' },
-          orderBy: [{ sortOrder: 'asc' }, { optionId: 'asc' }],
+          orderBy: [{ optionType: 'asc' }, { sortOrder: 'asc' }, { optionId: 'asc' }],
         },
       },
     });
@@ -539,10 +696,11 @@ export class ProductRepository {
     }
 
     return await prisma.$transaction(async (tx) => {
-      let sizeOptions = product.variantOptions;
+      let sizeOptions = product.variantOptions.filter((opt) => opt.optionType === 'size');
+      const colorOptions = product.variantOptions.filter((opt) => opt.optionType === 'color');
 
-      // Fallback: If no size variants exist, create a default "One Size" variant option
-      if (sizeOptions.length === 0) {
+      // Fallback: If no size variants exist, create a default "One Size" variant option.
+      if (sizeOptions.length === 0 && colorOptions.length === 0) {
         const newOption = await tx.productVariantOption.create({
           data: {
             productId: prodBig,
@@ -556,18 +714,43 @@ export class ProductRepository {
         sizeOptions = [newOption];
       }
 
-      const N = sizeOptions.length;
+      const combinations: Array<{ sizeOptionId: bigint | null; colorOptionId: bigint | null }> = [];
+      if (sizeOptions.length > 0 && colorOptions.length > 0) {
+        sizeOptions.forEach((sizeOpt) => {
+          colorOptions.forEach((colorOpt) => {
+            combinations.push({ sizeOptionId: sizeOpt.optionId, colorOptionId: colorOpt.optionId });
+          });
+        });
+      } else if (sizeOptions.length > 0) {
+        sizeOptions.forEach((sizeOpt) => {
+          combinations.push({ sizeOptionId: sizeOpt.optionId, colorOptionId: null });
+        });
+      } else {
+        colorOptions.forEach((colorOpt) => {
+          combinations.push({ sizeOptionId: null, colorOptionId: colorOpt.optionId });
+        });
+      }
+
+      if (combinations.length === 0) {
+        return true;
+      }
+
+      const N = combinations.length;
       const baseQty = Math.floor(amount / N);
       const remainder = amount % N;
 
-      // Update/Upsert stock count for each size option
+      // Update/Upsert stock count for each active size/color combination.
       for (let i = 0; i < N; i += 1) {
-        const option = sizeOptions[i];
+        const combo = combinations[i];
         const addAmount = baseQty + (i === 0 ? remainder : 0);
 
-        // Find existing inventory
+        // Find existing inventory row for this exact combination.
         const existingInv = await tx.productVariantInventory.findFirst({
-          where: { productId: prodBig, optionId: option.optionId },
+          where: {
+            productId: prodBig,
+            sizeOptionId: combo.sizeOptionId,
+            colorOptionId: combo.colorOptionId,
+          },
         });
 
         if (existingInv) {
@@ -581,7 +764,8 @@ export class ProductRepository {
           await tx.productVariantInventory.create({
             data: {
               productId: prodBig,
-              optionId: option.optionId,
+              sizeOptionId: combo.sizeOptionId,
+              colorOptionId: combo.colorOptionId,
               quantity: newQty,
             },
           });
@@ -667,13 +851,14 @@ export class ProductRepository {
 
       // Keep inventory row for this default option if it doesn't exist
       const existingInv = await tx.productVariantInventory.findFirst({
-        where: { productId: productIdBig, optionId: defaultOption.optionId },
+        where: { productId: productIdBig, sizeOptionId: defaultOption.optionId, colorOptionId: null },
       });
       if (!existingInv) {
         await tx.productVariantInventory.create({
           data: {
             productId: productIdBig,
-            optionId: defaultOption.optionId,
+            sizeOptionId: defaultOption.optionId,
+            colorOptionId: null,
             quantity: 0,
           },
         });

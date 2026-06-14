@@ -416,9 +416,10 @@ export class OrderRepository {
           },
         });
 
-        // Try to deduct inventory if the product has size options
+        let sizeOptionId: bigint | null = null;
+        let colorOptionId: bigint | null = null;
+
         if (item.selected_size) {
-          // Find the variant option matching selected size
           const sizeOption = await tx.productVariantOption.findFirst({
             where: {
               productId: prodBig,
@@ -426,45 +427,52 @@ export class OrderRepository {
               label: { equals: item.selected_size, mode: 'insensitive' },
             },
           });
+          sizeOptionId = sizeOption?.optionId || null;
+        }
 
-          if (sizeOption) {
-            // Find inventory entry
-            const inventory = await tx.productVariantInventory.findFirst({
-              where: { productId: prodBig, optionId: sizeOption.optionId },
-            });
-
-            if (inventory) {
-              const newQty = Math.max(0, inventory.quantity - item.qty);
-              await tx.productVariantInventory.update({
-                where: { inventoryId: inventory.inventoryId },
-                data: { quantity: newQty },
-              });
-            }
-          }
-        } else {
-          // If no size is specified, check if there is exactly one size option for this product
-          // (covers both optionless 'One Size' and set products with a single standard option)
-          const sizeOptions = await tx.productVariantOption.findMany({
+        if (item.selected_color) {
+          const colorOption = await tx.productVariantOption.findFirst({
             where: {
               productId: prodBig,
-              optionType: 'size',
+              optionType: 'color',
+              label: { equals: item.selected_color, mode: 'insensitive' },
             },
+          });
+          colorOptionId = colorOption?.optionId || null;
+        }
+
+        if (!sizeOptionId && !colorOptionId) {
+          const sizeOptions = await tx.productVariantOption.findMany({
+            where: { productId: prodBig, optionType: 'size' },
+            orderBy: [{ sortOrder: 'asc' }, { optionId: 'asc' }],
+          });
+          const colorOptions = await tx.productVariantOption.findMany({
+            where: { productId: prodBig, optionType: 'color' },
+            orderBy: [{ sortOrder: 'asc' }, { optionId: 'asc' }],
           });
 
           if (sizeOptions.length === 1) {
-            const onlyOption = sizeOptions[0];
-            const inventory = await tx.productVariantInventory.findFirst({
-              where: { productId: prodBig, optionId: onlyOption.optionId },
-            });
-
-            if (inventory) {
-              const newQty = Math.max(0, inventory.quantity - item.qty);
-              await tx.productVariantInventory.update({
-                where: { inventoryId: inventory.inventoryId },
-                data: { quantity: newQty },
-              });
-            }
+            sizeOptionId = sizeOptions[0].optionId;
           }
+          if (colorOptions.length === 1) {
+            colorOptionId = colorOptions[0].optionId;
+          }
+        }
+
+        const inventory = await tx.productVariantInventory.findFirst({
+          where: {
+            productId: prodBig,
+            sizeOptionId,
+            colorOptionId,
+          },
+        });
+
+        if (inventory) {
+          const newQty = Math.max(0, inventory.quantity - item.qty);
+          await tx.productVariantInventory.update({
+            where: { inventoryId: inventory.inventoryId },
+            data: { quantity: newQty },
+          });
         }
       }
 

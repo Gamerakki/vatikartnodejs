@@ -208,7 +208,7 @@ export class ProductService {
         const opt = data?.variants.find(v => v.optionType === 'size' && v.label === 'Free Size');
         if (opt) {
           await productRepository.saveInventory(Number(saved.productId), p.companyId, [
-            { optionId: Number(opt.optionId), quantity: p.stock }
+            { sizeOptionId: Number(opt.optionId), colorOptionId: null, quantity: p.stock }
           ]);
         }
       }
@@ -450,7 +450,8 @@ export class ProductService {
   async saveInventory(loggedInUserId: number, req: SaveInventoryReq): Promise<void> {
     const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
     const items = (req.items || []).map((i) => ({
-      optionId: i.option_id,
+      sizeOptionId: i.size_option_id ?? null,
+      colorOptionId: i.color_option_id ?? null,
       quantity: i.quantity,
     }));
 

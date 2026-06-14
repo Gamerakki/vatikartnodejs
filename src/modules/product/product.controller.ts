@@ -283,7 +283,7 @@ export class ProductController {
 
       if (msg === 'product not found') {
         httpStatus = 404;
-      } else if (msg === 'invalid size option') {
+      } else if (msg === 'invalid variant option') {
         httpStatus = 501; // Not Implemented (custom mapping in Go)
       }
 

@@ -160,6 +160,7 @@ model Product {
   orderItems     OrderItem[]
   setCompositions ProductSetComposition[]
   groupPrices    GroupPrice[]
+  inventories    ProductVariantInventory[]
 
   @@map("products")
 }
@@ -203,18 +204,23 @@ model ProductVariantOption {
   // Relations
   product Product @relation(fields: [productId], references: [productId], onDelete: Cascade, onUpdate: Cascade)
 
-  inventories ProductVariantInventory[]
+  inventoriesAsSize  ProductVariantInventory[] @relation("SizeInv")
+  inventoriesAsColor ProductVariantInventory[] @relation("ColorInv")
 
   @@map("product_variant_options")
 }
 
 model ProductVariantInventory {
-  inventoryId BigInt @id @default(autoincrement()) @map("inventory_id")
-  productId   BigInt @map("product_id")
-  optionId    BigInt @map("option_id")
-  quantity    Int    @default(0)
+  inventoryId   BigInt  @id @default(autoincrement()) @map("inventory_id")
+  productId     BigInt  @map("product_id")
+  sizeOptionId  BigInt? @map("size_option_id")
+  colorOptionId BigInt? @map("color_option_id")
+  quantity      Int     @default(0)
+  sku           String? @db.VarChar(100)
 
-  option ProductVariantOption @relation(fields: [optionId], references: [optionId], onDelete: Cascade, onUpdate: Cascade)
+  product     Product               @relation(fields: [productId], references: [productId], onDelete: Cascade)
+  sizeOption  ProductVariantOption? @relation("SizeInv", fields: [sizeOptionId], references: [optionId], onDelete: Cascade)
+  colorOption ProductVariantOption? @relation("ColorInv", fields: [colorOptionId], references: [optionId], onDelete: Cascade)
 
   @@map("product_variant_inventories")
 }
