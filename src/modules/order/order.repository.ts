@@ -31,7 +31,7 @@ function getServerItemPrice(
 
 export class OrderRepository {
   async fetchPublicOrdersByCustomerPhone(phone: string): Promise<any[]> {
-    const normalizedPhone = phone.replace(/\s+/g, '');
+    const normalizedPhone = phone.replace(/\D/g, '');
 
     const orders = await prisma.order.findMany({
       where: {
@@ -394,12 +394,13 @@ export class OrderRepository {
       // Commit exact server calculations to DB
       data.subtotal = serverSubtotal;
       data.total = serverTotal;
+      const normalizedCustomerPhone = data.customer_phone.replace(/\D/g, '');
 
       // 2. Create Order
       const newOrder = await tx.order.create({
         data: {
           customerName: data.customer_name,
-          customerPhone: data.customer_phone,
+          customerPhone: normalizedCustomerPhone,
           customerAddress: data.customer_address,
           status: 'UNCONFIRMED',
           subtotal: data.subtotal,
