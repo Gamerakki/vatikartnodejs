@@ -336,7 +336,6 @@ export class OrderRepository {
 
       const productMap = new Map(dbProducts.map((p) => [Number(p.productId), p]));
       let calculatedSubtotal = 0;
-      let calculatedTax = 0;
       const resellerMarkup = Number(data.reseller_markup || 0);
       const multiplier = resellerMarkup > 0 ? (1 + resellerMarkup / 100) : 1;
 
@@ -362,13 +361,26 @@ export class OrderRepository {
         item.price = markedUpPrice;
         const itemSubtotal = markedUpPrice * item.qty;
         calculatedSubtotal += itemSubtotal;
-
-        // Dynamic tax calculation per product
-        const gstRate = dbProduct.gstRate ? Number(dbProduct.gstRate) : 0;
-        calculatedTax += itemSubtotal * (gstRate / 100);
       }
 
       const serverSubtotal = Number(calculatedSubtotal.toFixed(2));
+      const discountPercent = serverSubtotal > 0 ? (data.discount / serverSubtotal) : 0;
+      if (discountPercent > 0.20) {
+        throw new Error('Invalid discount value');
+      }
+
+      let calculatedTax = 0;
+      for (const item of data.items) {
+        const dbProduct = productMap.get(item.product_id);
+        if (!dbProduct) {
+          throw new Error(`Product ID ${item.product_id} not found`);
+        }
+        const itemSubtotal = Number(item.price) * item.qty;
+        const gstRate = dbProduct.gstRate ? Number(dbProduct.gstRate) : 0;
+        // Apply coupon discount effect before GST to match checkout calculations.
+        calculatedTax += itemSubtotal * (gstRate / 100) * (1 - discountPercent);
+      }
+
       const serverTax = Number(calculatedTax.toFixed(2));
       const serverTotal = Number(
         (serverSubtotal - data.discount + data.shipping + serverTax).toFixed(2)
