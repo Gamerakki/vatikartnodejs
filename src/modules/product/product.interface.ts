@@ -51,6 +51,7 @@ export interface ProductListItemRes {
   price_mode?: string | null;
   set_quantity?: number | null;
   set_name?: string | null;
+  minimum_order_qty?: number | null;
   set_composition?: SetCompositionItemRes[];
 }
 

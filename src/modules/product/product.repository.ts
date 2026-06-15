@@ -140,6 +140,7 @@ export class ProductRepository {
         price_mode: p.priceMode,
         set_quantity: p.setQuantity ? Number(p.setQuantity) : null,
         set_name: p.setName,
+        minimum_order_qty: p.minimumOrderQty,
         set_composition: p.setCompositions.map((c) => ({
           size_label: c.sizeLabel,
           color_label: c.colorLabel,
@@ -257,6 +258,7 @@ export class ProductRepository {
         price_mode: p.priceMode,
         set_quantity: p.setQuantity ? Number(p.setQuantity) : null,
         set_name: p.setName,
+        minimum_order_qty: p.minimumOrderQty,
         set_composition: p.setCompositions.map((c) => ({
           size_label: c.sizeLabel,
           color_label: c.colorLabel,
