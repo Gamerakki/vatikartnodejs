@@ -42,6 +42,11 @@ model Company {
   companyName  String     @map("company_name") @db.VarChar(250)
   address      String?    @db.Text
   pincode      String?    @db.VarChar(10)
+  tagline      String?    @db.VarChar(300)
+  phone        String?    @db.VarChar(15)
+  email        String?    @db.VarChar(254)
+  currency     String?    @default("INR") @db.VarChar(5)
+  upiId        String?    @map("upi_id") @db.VarChar(100)
   logoImgPath  String?    @map("logo_img_path") @db.Text
   addedBy      BigInt?    @unique @map("added_by")
   addedDate    DateTime   @default(now()) @map("added_date") @db.Timestamptz

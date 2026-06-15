@@ -5,8 +5,28 @@ const mobileRegex = /^[6-9][0-9]{9}$/;
 
 export const saveCompanySchema = z.object({
   company_name: z.string().min(1, { message: 'The field company_name is required' }),
+  tagline: z.string().max(300, { message: 'The field tagline must have at most 300 characters' }).optional().default(''),
   address: z.string().optional().default(''),
   pincode: z.string().max(10, { message: 'The field pincode must have at most 10 characters' }).optional().default(''),
+  phone: z.string()
+    .refine((val) => !val || (val.replace(/\D/g, '').length >= 10 && val.replace(/\D/g, '').length <= 15), {
+      message: 'The field phone must be a valid phone number',
+    })
+    .optional()
+    .default(''),
+  email: z.string()
+    .refine((val) => !val || emailRegex.test(val), {
+      message: 'The field email must be a valid email',
+    })
+    .optional()
+    .default(''),
+  currency: z.string()
+    .refine((val) => !val || /^[A-Z]{3}$/.test(val), {
+      message: 'The field currency must be a 3-letter code (e.g. INR)',
+    })
+    .optional()
+    .default('INR'),
+  upi_id: z.string().max(100, { message: 'The field upi_id must have at most 100 characters' }).optional().default(''),
 });
 
 export const saveSocialMediaReqSchema = z.object({

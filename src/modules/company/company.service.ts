@@ -34,8 +34,13 @@ export class CompanyService {
 
     await companyRepository.saveCompany({
       companyName: companyReqData.company_name,
+      tagline: companyReqData.tagline?.trim() || undefined,
       address: companyReqData.address || '',
       pincode: companyReqData.pincode || '',
+      phone: companyReqData.phone?.replace(/\D/g, '') || undefined,
+      email: companyReqData.email?.trim() || undefined,
+      currency: companyReqData.currency?.trim().toUpperCase() || 'INR',
+      upiId: companyReqData.upi_id?.trim() || undefined,
       addedBy: loggedInUserId,
       logoImgPath,
     });

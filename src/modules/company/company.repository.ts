@@ -55,8 +55,13 @@ export class CompanyRepository {
 
   async saveCompany(data: {
     companyName: string;
+    tagline?: string;
     address: string;
     pincode: string;
+    phone?: string;
+    email?: string;
+    currency?: string;
+    upiId?: string;
     addedBy: number;
     logoImgPath?: string;
   }) {
@@ -68,16 +73,26 @@ export class CompanyRepository {
       where: { addedBy: userIdBig },
       update: {
         companyName: data.companyName,
+        tagline: data.tagline || null,
         address: data.address,
         pincode: data.pincode,
+        phone: data.phone || null,
+        email: data.email || null,
+        currency: data.currency || 'INR',
+        upiId: data.upiId || null,
         updatedBy: userIdBig,
         updatedDate: now,
         ...(data.logoImgPath ? { logoImgPath: data.logoImgPath } : {}),
       },
       create: {
         companyName: data.companyName,
+        tagline: data.tagline || null,
         address: data.address,
         pincode: data.pincode,
+        phone: data.phone || null,
+        email: data.email || null,
+        currency: data.currency || 'INR',
+        upiId: data.upiId || null,
         addedBy: userIdBig,
         logoImgPath: data.logoImgPath || null,
         subdomain,
@@ -216,8 +231,13 @@ export class CompanyRepository {
       select: {
         companyId: true,
         companyName: true,
+        tagline: true,
         address: true,
         pincode: true,
+        phone: true,
+        email: true,
+        currency: true,
+        upiId: true,
         logoImgPath: true,
         subdomain: true,
         watermarkEnabled: true,
@@ -230,8 +250,13 @@ export class CompanyRepository {
     return {
       company_id: Number(company.companyId),
       company_name: company.companyName,
+      tagline: company.tagline,
       address: company.address,
       pincode: company.pincode,
+      phone: company.phone,
+      email: company.email,
+      currency: company.currency,
+      upi_id: company.upiId,
       logo_img_path: company.logoImgPath,
       subdomain: company.subdomain || null,
       watermark_enabled: company.watermarkEnabled,
