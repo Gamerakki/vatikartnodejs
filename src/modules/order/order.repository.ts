@@ -335,9 +335,16 @@ export class OrderRepository {
       });
 
       const productMap = new Map(dbProducts.map((p) => [Number(p.productId), p]));
-      let calculatedSubtotal = 0;
+      let calculatedGrossSubtotal = 0;
+      let calculatedDiscountedSubtotal = 0;
       const resellerMarkup = Number(data.reseller_markup || 0);
       const multiplier = resellerMarkup > 0 ? (1 + resellerMarkup / 100) : 1;
+
+      // Compute aggregate quantity per product ID to resolve bulk pricing slabs correctly for multi-variant checkouts
+      const aggregateQtyMap = new Map<number, number>();
+      for (const item of data.items) {
+        aggregateQtyMap.set(item.product_id, (aggregateQtyMap.get(item.product_id) || 0) + item.qty);
+      }
 
       for (const item of data.items) {
         const dbProduct = productMap.get(item.product_id);
@@ -351,21 +358,31 @@ export class OrderRepository {
           throw new Error(`Product "${dbProduct.product}" requires a minimum order of ${moq} units.`);
         }
 
-        const itemPrice = getServerItemPrice(dbProduct, item.qty);
-        const markedUpPrice = Number((itemPrice * multiplier).toFixed(2));
+        // Calculate gross price (original retail price)
+        const basePrice = dbProduct.price ? Number(dbProduct.price) : 0;
+        const grossPrice = Number((basePrice * multiplier).toFixed(2));
+        calculatedGrossSubtotal += grossPrice * item.qty;
+
+        // Calculate discounted price (slab B2B price)
+        const aggQty = aggregateQtyMap.get(item.product_id) || item.qty;
+        const discountedPrice = getServerItemPrice(dbProduct, aggQty);
+        const markedUpPrice = Number((discountedPrice * multiplier).toFixed(2));
 
         if (Math.abs(Number(item.price) - markedUpPrice) > 0.5) {
           throw new Error('Price validation failed; order rejected');
         }
 
         item.price = markedUpPrice;
-        const itemSubtotal = markedUpPrice * item.qty;
-        calculatedSubtotal += itemSubtotal;
+        calculatedDiscountedSubtotal += markedUpPrice * item.qty;
       }
 
-      const serverSubtotal = Number(calculatedSubtotal.toFixed(2));
-      const discountPercent = serverSubtotal > 0 ? (data.discount / serverSubtotal) : 0;
-      if (discountPercent > 0.20) {
+      const serverGrossSubtotal = Number(calculatedGrossSubtotal.toFixed(2));
+      const serverDiscountedSubtotal = Number(calculatedDiscountedSubtotal.toFixed(2));
+      const volumeDiscountSavings = Number((serverGrossSubtotal - serverDiscountedSubtotal).toFixed(2));
+      const couponDiscount = Number((data.discount - volumeDiscountSavings).toFixed(2));
+
+      const couponDiscountPercent = serverDiscountedSubtotal > 0 ? (couponDiscount / serverDiscountedSubtotal) : 0;
+      if (couponDiscountPercent > 0.20) {
         throw new Error('Invalid discount value');
       }
 
@@ -378,21 +395,21 @@ export class OrderRepository {
         const itemSubtotal = Number(item.price) * item.qty;
         const gstRate = dbProduct.gstRate ? Number(dbProduct.gstRate) : 0;
         // Apply coupon discount effect before GST to match checkout calculations.
-        calculatedTax += itemSubtotal * (gstRate / 100) * (1 - discountPercent);
+        calculatedTax += itemSubtotal * (gstRate / 100) * (1 - couponDiscountPercent);
       }
 
       const serverTax = Number(calculatedTax.toFixed(2));
       const serverTotal = Number(
-        (serverSubtotal - data.discount + data.shipping + serverTax).toFixed(2)
+        (serverDiscountedSubtotal - couponDiscount + data.shipping + serverTax).toFixed(2)
       );
 
-      // Verify that client totals do not deviate significantly
-      if (Math.abs(Number(data.subtotal) - serverSubtotal) > 0.5 || Math.abs(Number(data.total) - serverTotal) > 0.5) {
+      // Verify that client totals do not deviate significantly (compare client subtotal with our gross retail subtotal)
+      if (Math.abs(Number(data.subtotal) - serverGrossSubtotal) > 0.5 || Math.abs(Number(data.total) - serverTotal) > 0.5) {
         throw new Error('Price validation failed; order rejected');
       }
 
       // Commit exact server calculations to DB
-      data.subtotal = serverSubtotal;
+      data.subtotal = serverDiscountedSubtotal;
       data.total = serverTotal;
       const normalizedCustomerPhone = data.customer_phone.replace(/\D/g, '');
 
