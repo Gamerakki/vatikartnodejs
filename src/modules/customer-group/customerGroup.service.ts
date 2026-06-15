@@ -1,7 +1,10 @@
 import { companyRepository } from '../company/company.repository';
 import { customerGroupRepository } from './customerGroup.repository';
 
-function normalizePhone(phone: string): string {
+function normalizePhone(phone: string | null | undefined): string {
+  if (typeof phone !== 'string') {
+    return '';
+  }
   return phone.replace(/\D/g, '').slice(-12);
 }
 
@@ -49,8 +52,12 @@ export class CustomerGroupService {
     return customerGroupRepository.fetchGroupPrices(companyId, groupId, catalogueId);
   }
 
-  async resolveGroupForPublicCustomer(companyId: number, customerPhone: string) {
-    return customerGroupRepository.resolveGroupByPhone(companyId, normalizePhone(customerPhone));
+  async resolveGroupForPublicCustomer(companyId: number, customerPhone: string | null | undefined) {
+    const normalizedPhone = normalizePhone(customerPhone);
+    if (!normalizedPhone) {
+      return null;
+    }
+    return customerGroupRepository.resolveGroupByPhone(companyId, normalizedPhone);
   }
 
   async fetchPriceMapForGroup(groupId: number, productIds: number[]) {

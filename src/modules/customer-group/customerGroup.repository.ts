@@ -209,7 +209,12 @@ export class CustomerGroupRepository {
   }
 
   async resolveGroupByPhone(companyId: number, customerPhone: string) {
-    const last10Digits = customerPhone.slice(-10);
+    const normalizedPhone = (customerPhone || '').replace(/\D/g, '');
+    if (!normalizedPhone) {
+      return null;
+    }
+
+    const last10Digits = normalizedPhone.slice(-10);
     const member = await prisma.customerGroupMember.findFirst({
       where: {
         customerPhone: {
