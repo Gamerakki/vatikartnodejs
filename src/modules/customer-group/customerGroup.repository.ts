@@ -209,9 +209,12 @@ export class CustomerGroupRepository {
   }
 
   async resolveGroupByPhone(companyId: number, customerPhone: string) {
+    const last10Digits = customerPhone.slice(-10);
     const member = await prisma.customerGroupMember.findFirst({
       where: {
-        customerPhone,
+        customerPhone: {
+          endsWith: last10Digits,
+        },
         group: {
           companyId: BigInt(companyId),
         },

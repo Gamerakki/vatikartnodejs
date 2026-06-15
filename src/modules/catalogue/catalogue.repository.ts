@@ -350,10 +350,11 @@ export class CatalogueRepository {
   }
 
   async hasCustomerAccess(catalogueId: number, phone: string): Promise<boolean> {
+    const normalizedPhone = phone.replace(/\D/g, '');
     const access = await prisma.customerAccessRequest.findFirst({
       where: {
         catalogueId: BigInt(catalogueId),
-        customerPhone: phone,
+        customerPhone: normalizedPhone,
         status: 'APPROVED',
       }
     });
@@ -386,11 +387,12 @@ export class CatalogueRepository {
   }
 
   async createAccessRequest(catalogueId: number, phone: string, name: string): Promise<void> {
+    const normalizedPhone = phone.replace(/\D/g, '');
     await prisma.customerAccessRequest.upsert({
       where: {
         catalogueId_customerPhone: {
           catalogueId: BigInt(catalogueId),
-          customerPhone: phone,
+          customerPhone: normalizedPhone,
         }
       },
       update: {
@@ -400,7 +402,7 @@ export class CatalogueRepository {
       },
       create: {
         catalogueId: BigInt(catalogueId),
-        customerPhone: phone,
+        customerPhone: normalizedPhone,
         customerName: name,
         status: 'PENDING',
       }
