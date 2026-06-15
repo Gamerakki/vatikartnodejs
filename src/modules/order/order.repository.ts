@@ -337,6 +337,8 @@ export class OrderRepository {
       const productMap = new Map(dbProducts.map((p) => [Number(p.productId), p]));
       let calculatedSubtotal = 0;
       let calculatedTax = 0;
+      const resellerMarkup = Number(data.reseller_markup || 0);
+      const multiplier = resellerMarkup > 0 ? (1 + resellerMarkup / 100) : 1;
 
       for (const item of data.items) {
         const dbProduct = productMap.get(item.product_id);
@@ -351,13 +353,14 @@ export class OrderRepository {
         }
 
         const itemPrice = getServerItemPrice(dbProduct, item.qty);
+        const markedUpPrice = Number((itemPrice * multiplier).toFixed(2));
 
-        if (Math.abs(Number(item.price) - itemPrice) > 0.5) {
+        if (Math.abs(Number(item.price) - markedUpPrice) > 0.5) {
           throw new Error('Price validation failed; order rejected');
         }
 
-        item.price = itemPrice;
-        const itemSubtotal = itemPrice * item.qty;
+        item.price = markedUpPrice;
+        const itemSubtotal = markedUpPrice * item.qty;
         calculatedSubtotal += itemSubtotal;
 
         // Dynamic tax calculation per product
