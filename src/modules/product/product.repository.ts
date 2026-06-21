@@ -51,7 +51,6 @@ export class ProductRepository {
         bulkDiscounts: {
           orderBy: { sortOrder: 'asc' },
         },
-        setCompositions: true,
       },
       orderBy: { productId: 'desc' },
     });
@@ -141,12 +140,6 @@ export class ProductRepository {
         set_quantity: p.setQuantity ? Number(p.setQuantity) : null,
         set_name: p.setName,
         minimum_order_qty: p.minimumOrderQty,
-        set_composition: p.setCompositions.map((c) => ({
-          size_label: c.sizeLabel,
-          color_label: c.colorLabel,
-          color_hex: c.colorHex,
-          qty_in_set: c.qtyInSet,
-        })),
       };
     });
   }
@@ -169,7 +162,6 @@ export class ProductRepository {
         bulkDiscounts: {
           orderBy: { sortOrder: 'asc' },
         },
-        setCompositions: true,
       },
       orderBy: { productId: 'desc' },
     });
@@ -259,12 +251,6 @@ export class ProductRepository {
         set_quantity: p.setQuantity ? Number(p.setQuantity) : null,
         set_name: p.setName,
         minimum_order_qty: p.minimumOrderQty,
-        set_composition: p.setCompositions.map((c) => ({
-          size_label: c.sizeLabel,
-          color_label: c.colorLabel,
-          color_hex: c.colorHex,
-          qty_in_set: c.qtyInSet,
-        })),
       };
     });
   }
@@ -389,9 +375,6 @@ export class ProductRepository {
         productId: BigInt(productId),
         companyId: BigInt(companyId),
         isDeleted: false,
-      },
-      include: {
-        setCompositions: true,
       },
     });
 
@@ -794,77 +777,6 @@ export class ProductRepository {
       data: {
         isDeleted: true,
       },
-    });
-  }
-
-  async saveSetComposition(
-    productId: number,
-    companyId: number,
-    composition: { size_label: string; color_label: string; color_hex?: string | null; qty_in_set: number }[]
-  ) {
-    const productIdBig = BigInt(productId);
-    const companyIdBig = BigInt(companyId);
-
-    return await prisma.$transaction(async (tx) => {
-      const product = await tx.product.findFirst({
-        where: { productId: productIdBig, companyId: companyIdBig, isDeleted: false },
-      });
-
-      if (!product) {
-        throw new Error('product not found');
-      }
-
-      // Delete old composition entries
-      await tx.productSetComposition.deleteMany({
-        where: { productId: productIdBig },
-      });
-
-      // Insert new composition entries
-      if (composition.length > 0) {
-        await tx.productSetComposition.createMany({
-          data: composition.map((c) => ({
-            productId: productIdBig,
-            sizeLabel: c.size_label,
-            colorLabel: c.color_label,
-            colorHex: c.color_hex || null,
-            qtyInSet: c.qty_in_set,
-          })),
-        });
-      }
-
-      // Maintain compatibility with variants:
-      // Delete existing size/color variant options for this product
-      await tx.productVariantOption.deleteMany({
-        where: { productId: productIdBig },
-      });
-
-      // Add a single default size option: 'Standard Set' (or set_name if available)
-      const label = product.setName || 'Standard Set';
-      const defaultOption = await tx.productVariantOption.create({
-        data: {
-          productId: productIdBig,
-          optionType: 'size',
-          label: label,
-          isSet: true,
-          setQuantity: Math.max(1, Number(product.setQuantity || 1)),
-          sortOrder: 0,
-        },
-      });
-
-      // Keep inventory row for this default option if it doesn't exist
-      const existingInv = await tx.productVariantInventory.findFirst({
-        where: { productId: productIdBig, sizeOptionId: defaultOption.optionId, colorOptionId: null },
-      });
-      if (!existingInv) {
-        await tx.productVariantInventory.create({
-          data: {
-            productId: productIdBig,
-            sizeOptionId: defaultOption.optionId,
-            colorOptionId: null,
-            quantity: 0,
-          },
-        });
-      }
     });
   }
 }

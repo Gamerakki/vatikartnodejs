@@ -17,7 +17,6 @@ import {
   ProductInventoryRes,
   ShopInventoryItemRes,
   ShopInventoryStatsRes,
-  SaveSetCompositionReq,
 } from './product.interface';
 import { generatePresignedUploadURL, uploadToR2 } from '../../utils/s3';
 
@@ -412,12 +411,6 @@ export class ProductService {
         colors: [],
         custom_options: [],
       },
-      set_composition: (product as any).setCompositions?.map((c: any) => ({
-        size_label: c.sizeLabel,
-        color_label: c.colorLabel,
-        color_hex: c.colorHex,
-        qty_in_set: c.qtyInSet,
-      })) || [],
     };
 
     variants.forEach((v) => {
@@ -490,11 +483,6 @@ export class ProductService {
   async deleteProducts(loggedInUserId: number, productIds: number[]): Promise<void> {
     const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
     await productRepository.softDeleteProducts(productIds, companyId);
-  }
-
-  async saveSetComposition(loggedInUserId: number, req: SaveSetCompositionReq): Promise<void> {
-    const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
-    await productRepository.saveSetComposition(req.product_id, companyId, req.composition);
   }
 }
 

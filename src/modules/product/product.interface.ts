@@ -52,7 +52,6 @@ export interface ProductListItemRes {
   set_quantity?: number | null;
   set_name?: string | null;
   minimum_order_qty?: number | null;
-  set_composition?: SetCompositionItemRes[];
 }
 
 export interface BulkDiscountSlabReq {
@@ -152,7 +151,6 @@ export interface BasicInfoRes {
   description: string | null;
   bulk_discounts: BulkDiscountSlabRes[];
   variants: ProductVariantsRes;
-  set_composition?: SetCompositionItemRes[];
 }
 
 export interface InventoryItemRes {
@@ -187,18 +185,6 @@ export interface ShopInventoryStatsRes {
   totalQuantity: number;
   lowStockItems: number;
   outOfStockItems: number;
-}
-
-export interface SetCompositionItemRes {
-  size_label: string;
-  color_label: string;
-  color_hex?: string | null;
-  qty_in_set: number;
-}
-
-export interface SaveSetCompositionReq {
-  product_id: number;
-  composition: SetCompositionItemRes[];
 }
 
 
