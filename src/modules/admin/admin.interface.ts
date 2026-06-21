@@ -28,9 +28,10 @@ export interface CompanyRegistryItemRes {
 
 export interface RenewSubscriptionReq {
   company_id: string;
-  plan_name: 'FREE' | 'PREMIUM' | 'ENTERPRISE';
+  plan_name: 'FREE' | 'SILVER' | 'GOLD' | 'DIAMOND';
   duration_months: number;
   price_paid: number;
+  action: 'UPGRADE' | 'DOWNGRADE' | 'EXTEND' | 'STOP';
 }
 
 export interface MerchantPerformanceRes {

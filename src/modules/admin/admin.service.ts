@@ -33,7 +33,8 @@ export class AdminService {
       req.company_id,
       req.plan_name,
       req.duration_months,
-      req.price_paid
+      req.price_paid,
+      req.action
     );
   }
 }

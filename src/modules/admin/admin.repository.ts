@@ -31,6 +31,7 @@ export class AdminRepository {
         OR: [
           { status: 'EXPIRED' },
           { status: 'CANCELLED' },
+          { status: 'INACTIVE' },
           { endDate: { lt: now } },
         ],
       },
@@ -106,9 +107,10 @@ export class AdminRepository {
 
   async renewSubscription(
     companyId: string,
-    planName: 'FREE' | 'PREMIUM' | 'ENTERPRISE',
+    planName: 'FREE' | 'SILVER' | 'GOLD' | 'DIAMOND',
     durationMonths: number,
-    pricePaid: number
+    pricePaid: number,
+    action: 'UPGRADE' | 'DOWNGRADE' | 'EXTEND' | 'STOP'
   ) {
     const now = new Date();
     
@@ -118,13 +120,20 @@ export class AdminRepository {
     });
 
     let newStartDate = now;
-    // If there is an active subscription with an end date in the future, extend it
-    if (existingSub && existingSub.endDate && existingSub.endDate > now && existingSub.status === 'ACTIVE') {
-      newStartDate = existingSub.endDate;
-    }
+    let newEndDate = new Date(now);
+    let status = 'ACTIVE';
 
-    const newEndDate = new Date(newStartDate);
-    newEndDate.setMonth(newEndDate.getMonth() + durationMonths);
+    if (action === 'STOP') {
+      status = 'INACTIVE';
+      newEndDate = now;
+    } else {
+      if (action === 'EXTEND' && existingSub?.endDate && existingSub.endDate > now && existingSub.status === 'ACTIVE') {
+        newStartDate = existingSub.endDate;
+      }
+
+      newEndDate = new Date(newStartDate);
+      newEndDate.setMonth(newEndDate.getMonth() + durationMonths);
+    }
 
     // Upsert the subscription
     return await prisma.subscription.upsert({
@@ -134,7 +143,7 @@ export class AdminRepository {
         planName,
         startDate: newStartDate,
         endDate: newEndDate,
-        status: 'ACTIVE',
+        status,
         pricePaid: pricePaid,
         updatedDate: now,
       },
@@ -142,7 +151,7 @@ export class AdminRepository {
         planName,
         startDate: newStartDate,
         endDate: newEndDate,
-        status: 'ACTIVE',
+        status,
         pricePaid: pricePaid,
         updatedDate: now,
       },

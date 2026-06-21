@@ -2,11 +2,10 @@ import { z } from 'zod';
 
 export const renewSubscriptionSchema = z.object({
   company_id: z.string().min(1, { message: 'The field company_id is required' }),
-  plan_name: z.enum(['FREE', 'PREMIUM', 'ENTERPRISE'], {
-    errorMap: () => ({ message: 'The plan_name must be FREE, PREMIUM, or ENTERPRISE' }),
-  }),
-  duration_months: z.number().int().positive({ message: 'duration_months must be a positive integer' }),
-  price_paid: z.number().nonnegative({ message: 'price_paid must be a non-negative number' }),
+  plan_name: z.enum(['FREE', 'SILVER', 'GOLD', 'DIAMOND']),
+  duration_months: z.number().int().nonnegative(),
+  price_paid: z.number().nonnegative(),
+  action: z.enum(['UPGRADE', 'DOWNGRADE', 'EXTEND', 'STOP']).default('UPGRADE'),
 });
 
 export const getStoreInsightsSchema = z.object({
