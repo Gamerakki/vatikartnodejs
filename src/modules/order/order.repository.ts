@@ -18,10 +18,16 @@ function getServerItemPrice(
   for (const slab of dbProduct.bulkDiscounts) {
     if (qty >= slab.minQty && (slab.maxQty === null || qty <= slab.maxQty)) {
       if (slab.discountedPrice != null) {
-        itemPrice = Number(slab.discountedPrice);
+        const slabPrice = Number(slab.discountedPrice);
+        if (slabPrice < itemPrice) {
+          itemPrice = slabPrice;
+        }
       } else if (slab.discountPercent != null && dbProduct.price != null) {
-        const basePrice = Number(dbProduct.price);
-        itemPrice = basePrice * (1 - Number(slab.discountPercent) / 100);
+        const pct = Number(slab.discountPercent);
+        if (pct > 0) {
+          const basePrice = Number(dbProduct.price);
+          itemPrice = basePrice * (1 - pct / 100);
+        }
       }
     }
   }
