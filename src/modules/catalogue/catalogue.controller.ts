@@ -4,6 +4,45 @@ import { saveCatalogueSchema, softDeleteRestoreCatalogueSchema } from './catalog
 import { prisma } from '../../config/database';
 import PDFDocument from 'pdfkit';
 import { uploadToR2 } from '../../utils/s3';
+import sharp from 'sharp';
+
+async function downloadImage(url: string): Promise<Buffer | null> {
+  if (!url) return null;
+  try {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(id);
+    if (!res.ok) return null;
+    const arrayBuffer = await res.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch (err) {
+    return null;
+  }
+}
+
+async function downloadImagesInBatches(urls: string[], limit = 10): Promise<(Buffer | null)[]> {
+  const results: (Buffer | null)[] = new Array(urls.length).fill(null);
+  const queue = urls.map((url, idx) => ({ url, idx }));
+
+  async function worker() {
+    while (queue.length > 0) {
+      const item = queue.shift();
+      if (!item) break;
+      if (item.url) {
+        results[item.idx] = await downloadImage(item.url);
+      }
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(limit, urls.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
+}
+
+async function processImageToPng(buffer: Buffer): Promise<Buffer> {
+  return await sharp(buffer).png().toBuffer();
+}
 
 function toCdnUrl(path?: string | null): string {
   if (!path) return '';
@@ -183,6 +222,7 @@ function renderProductCard(
   width: number,
   height: number,
   theme: PdfTheme,
+  imageBuffer: Buffer | null,
 ) {
   const tokens = getPdfThemeTokens(theme);
   const padding = theme === 'minimalist' ? 12 : 14;
@@ -192,40 +232,52 @@ function renderProductCard(
   doc.lineWidth(tokens.cardBorderWidth).roundedRect(x, y, width, height, 12).stroke(tokens.cardBorder);
   doc.restore();
 
-  const contentX = x + padding;
-  let cursorY = y + padding;
-  const contentWidth = width - padding * 2;
+  const isTwoColumns = width < 300;
+  const imageSize = isTwoColumns ? 64 : 90;
+  const imageX = x + padding;
+  const imageY = y + (height - imageSize) / 2;
 
-  doc.font(tokens.titleFont).fontSize(theme === 'bold' ? 13 : 12).fillColor(tokens.titleColor).text(
-    `${index + 1}. ${truncateText(product.product, theme === 'bold' ? 42 : 56)}`,
+  doc.save();
+  if (imageBuffer) {
+    try {
+      doc.roundedRect(imageX, imageY, imageSize, imageSize, 8).clip();
+      doc.image(imageBuffer, imageX, imageY, { width: imageSize, height: imageSize });
+    } catch (err) {
+      doc.roundedRect(imageX, imageY, imageSize, imageSize, 8).fill('#F1F5F9');
+      doc.font(tokens.bodyFont).fontSize(8).fillColor(tokens.mutedText).text('ERROR', imageX, imageY + imageSize / 2 - 4, { align: 'center', width: imageSize });
+    }
+  } else {
+    doc.roundedRect(imageX, imageY, imageSize, imageSize, 8).fill('#F1F5F9');
+    doc.font(tokens.bodyFont).fontSize(8).fillColor(tokens.mutedText).text('NO IMAGE', imageX, imageY + imageSize / 2 - 4, { align: 'center', width: imageSize });
+  }
+  doc.restore();
+
+  const contentX = x + padding + imageSize + 12;
+  const contentWidth = width - padding * 2 - imageSize - 12;
+  let cursorY = y + padding;
+
+  doc.font(tokens.titleFont).fontSize(theme === 'bold' ? 12 : 11).fillColor(tokens.titleColor).text(
+    `${index + 1}. ${truncateText(product.product, isTwoColumns ? 22 : 50)}`,
     contentX,
     cursorY,
     { width: contentWidth },
   );
-  cursorY += theme === 'bold' ? 22 : 20;
+  cursorY += theme === 'bold' ? 18 : 16;
 
   const priceText = product.price != null ? `Rs ${Number(product.price).toFixed(2)}` : 'NA';
   const mrpText = product.originalPrice != null ? `Rs ${Number(product.originalPrice).toFixed(2)}` : 'NA';
 
-  doc.font(tokens.bodyFont).fontSize(9.5).fillColor(tokens.bodyText).text(`SKU: ${product.sku || 'NA'}`, contentX, cursorY, { width: contentWidth });
-  cursorY += 14;
+  doc.font(tokens.bodyFont).fontSize(8.5).fillColor(tokens.bodyText).text(`SKU: ${product.sku || 'NA'}`, contentX, cursorY, { width: contentWidth });
+  cursorY += 12;
   doc.text(`Price: ${priceText}   MRP: ${mrpText}`, contentX, cursorY, { width: contentWidth });
-  cursorY += 14;
+  cursorY += 12;
   doc.text(`MOQ: ${product.minimumOrderQty ?? 1}   Mode: ${product.priceMode || 'perPiece'}`, contentX, cursorY, { width: contentWidth });
-  cursorY += 14;
+  cursorY += 12;
 
-  doc.font(tokens.bodyFont).fontSize(8.5).fillColor(tokens.mutedText).text(
-    `Description: ${truncateText(product.description, width < 250 ? 60 : 140)}`,
+  doc.font(tokens.bodyFont).fontSize(8).fillColor(tokens.mutedText).text(
+    `Description: ${truncateText(product.description, isTwoColumns ? 40 : 100)}`,
     contentX,
     cursorY,
-    { width: contentWidth },
-  );
-  cursorY += width < 250 ? 28 : 18;
-
-  doc.fontSize(8).fillColor(tokens.accent).text(
-    `Image: ${truncateText(toCdnUrl(product.images[0]?.productImgPath || ''), width < 250 ? 42 : 78)}`,
-    contentX,
-    Math.min(cursorY, y + height - 18),
     { width: contentWidth },
   );
 }
@@ -235,6 +287,25 @@ export class CatalogueController {
     try {
       const payload = await getExportCatalogueData(req.params.catalogueId);
       payload.products = payload.products.slice(0, 150);
+
+      // Download and convert images to PNG buffers
+      const imageUrls = payload.products.map((p) => {
+        const path = p.images[0]?.productImgPath;
+        return path ? toCdnUrl(path) : '';
+      });
+
+      const rawBuffers = await downloadImagesInBatches(imageUrls, 10);
+      const pngBuffers = await Promise.all(
+        rawBuffers.map(async (buf) => {
+          if (!buf) return null;
+          try {
+            return await processImageToPng(buf);
+          } catch (err) {
+            return null;
+          }
+        })
+      );
+
       const theme = normalizePdfTheme(String(req.query.theme || 'corporate'));
       const columns = Number(req.query.columns) === 2 ? 2 : 1;
       const tokens = getPdfThemeTokens(theme);
@@ -254,7 +325,7 @@ export class CatalogueController {
       const gap = 14;
       const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
       const cardWidth = columns === 2 ? (contentWidth - gap) / 2 : contentWidth;
-      const cardHeight = columns === 2 ? 138 : theme === 'minimalist' ? 104 : 116;
+      const cardHeight = columns === 2 ? 150 : 124;
       let x = doc.page.margins.left;
       let y = doc.y;
       let columnIndex = 0;
@@ -275,7 +346,7 @@ export class CatalogueController {
           columnIndex = 0;
         }
 
-        renderProductCard(doc, product, index, x, y, cardWidth, cardHeight, theme);
+        renderProductCard(doc, product, index, x, y, cardWidth, cardHeight, theme, pngBuffers[index]);
 
         if (columns === 2) {
           if (columnIndex === 0) {
