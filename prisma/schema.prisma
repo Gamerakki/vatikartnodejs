@@ -21,10 +21,15 @@ model User {
   isAdmin        Boolean   @default(false) @map("is_admin")
   isDeleted      Boolean   @default(false) @map("is_deleted")
   pushToken      String?   @map("push_token") @db.Text
+  role           String    @default("OWNER") @map("role") @db.VarChar(20)
+  companyId      BigInt?   @map("company_id")
 
   // Self relations
   creator      User?  @relation("UserToUser", fields: [addedBy], references: [userId], onDelete: Cascade, onUpdate: Cascade)
   createdUsers User[] @relation("UserToUser")
+
+  // Company membership (for SALES_PERSON role)
+  company Company? @relation("UserCompany", fields: [companyId], references: [companyId], onDelete: SetNull, onUpdate: Cascade)
 
   // Relations to other tables
   addedCompanies    Company[]   @relation("CompanyAddedBy")
@@ -64,6 +69,7 @@ model Company {
   // Relations
   addedByUser   User? @relation("CompanyAddedBy", fields: [addedBy], references: [userId], onDelete: Cascade, onUpdate: Cascade)
   updatedByUser User? @relation("CompanyUpdatedBy", fields: [updatedBy], references: [userId], onDelete: SetNull, onUpdate: Cascade)
+  users         User[] @relation("UserCompany")
 
   socialMediaMappers CompanySocialMediaMapper[]
   catalogues         Catalogue[]

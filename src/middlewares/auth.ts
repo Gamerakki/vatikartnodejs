@@ -6,6 +6,7 @@ declare global {
   namespace Express {
     interface Locals {
       userId?: number;
+      role?: string;
     }
   }
 }
@@ -24,6 +25,7 @@ export function validateAuth(req: Request, res: Response, next: NextFunction) {
 
     if (decoded && decoded.user_id) {
       res.locals.userId = Number(decoded.user_id);
+      res.locals.role = typeof decoded.role === 'string' ? decoded.role : 'OWNER';
       next();
     } else {
       res.status(503).json({ status: false, msg: 'Session Inactive' });
@@ -31,6 +33,14 @@ export function validateAuth(req: Request, res: Response, next: NextFunction) {
   } catch (err) {
     res.status(401).json({ status: false, msg: 'Invalid Token', error: (err as Error).message });
   }
+}
+
+export function requireOwner(req: Request, res: Response, next: NextFunction): void {
+  if (res.locals.role !== 'OWNER') {
+    res.status(403).json({ status: false, msg: 'Access denied. Owner privileges required.' });
+    return;
+  }
+  next();
 }
 
 export function validateNoAuth(req: Request, res: Response, next: NextFunction) {

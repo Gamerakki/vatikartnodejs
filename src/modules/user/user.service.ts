@@ -34,7 +34,7 @@ export class UserService {
       addedBy: userId,
     });
 
-    const token = generateToken({ user_id: userId });
+    const token = generateToken({ user_id: userId, role: 'OWNER' });
 
     // Background last active update
     await this.createOrUpdateLastActive(userId);
@@ -46,6 +46,7 @@ export class UserService {
         profile_pic_path: '',
       },
       token,
+      role: 'OWNER',
     };
   }
 
@@ -61,7 +62,7 @@ export class UserService {
     }
 
     const userId = Number(user.userId);
-    const token = generateToken({ user_id: userId });
+    const token = generateToken({ user_id: userId, role: user.role ?? 'OWNER' });
 
     // Background last active update
     await this.createOrUpdateLastActive(userId);
@@ -73,6 +74,7 @@ export class UserService {
         profile_pic_path: this.formatProfilePic(user.profilePicPath),
       },
       token,
+      role: user.role ?? 'OWNER',
     };
   }
 
@@ -115,6 +117,51 @@ export class UserService {
     } catch (err) {
       logger.error('Error updating user activity in Redis/DB', err);
     }
+  }
+
+  async fetchTeam(ownerUserId: number) {
+    const companyId = await companyRepository.fetchCompanyIDViaUserId(ownerUserId);
+    if (!companyId) throw new Error('Company not found');
+    const members = await userRepository.fetchTeamMembers(companyId);
+    return members.map((m) => ({
+      user_id: Number(m.userId),
+      first_name: m.firstName,
+      last_name: m.lastName,
+      email: m.emailId,
+      mobile: m.mobileNo,
+      role: m.role,
+      added_date: m.addedDate,
+    }));
+  }
+
+  async inviteTeamMember(ownerUserId: number, data: {
+    first_name: string;
+    last_name?: string;
+    username: string;
+    password: string;
+  }) {
+    const companyId = await companyRepository.fetchCompanyIDViaUserId(ownerUserId);
+    if (!companyId) throw new Error('Company not found');
+
+    const duplicate = await userRepository.checkExistingEmailMobile(data.username, 0);
+    if (duplicate) throw new Error('A user with this username already exists');
+
+    const passwordHash = await bcrypt.hash(data.password, 10);
+    const newUser = await userRepository.inviteTeamMember({
+      firstName: data.first_name,
+      lastName: data.last_name,
+      username: data.username,
+      passwordHash,
+      companyId,
+    });
+    return { user_id: Number(newUser.userId), role: 'SALES_PERSON' };
+  }
+
+  async removeTeamMember(ownerUserId: number, memberId: number) {
+    const companyId = await companyRepository.fetchCompanyIDViaUserId(ownerUserId);
+    if (!companyId) throw new Error('Company not found');
+    const removed = await userRepository.removeTeamMember(memberId, companyId);
+    if (!removed) throw new Error('Team member not found or does not belong to your company');
   }
 }
 

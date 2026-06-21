@@ -218,6 +218,14 @@ export class CompanyRepository {
   }
 
   async fetchCompanyIDViaUserId(userId: number): Promise<number> {
+    // Check user's companyId first (supports SALES_PERSON and migrated OWNERs)
+    const user = await prisma.user.findUnique({
+      where: { userId: BigInt(userId) },
+      select: { companyId: true },
+    });
+    if (user && user.companyId) return Number(user.companyId);
+
+    // Fallback: look up company where this user is the owner (OWNER role, legacy path)
     const company = await prisma.company.findUnique({
       where: { addedBy: BigInt(userId) },
       select: { companyId: true },

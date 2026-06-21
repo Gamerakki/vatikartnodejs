@@ -171,6 +171,43 @@ export class UserController {
       res.status(500).json({ status: false, msg: 'An error occurred', error: (err as Error).message });
     }
   }
+
+  async fetchTeam(req: Request, res: Response): Promise<void> {
+    try {
+      const members = await userService.fetchTeam(res.locals.userId!);
+      res.status(200).json({ status: true, msg: 'Team fetched', data: members });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async inviteTeamMember(req: Request, res: Response): Promise<void> {
+    const { first_name, last_name, username, password } = req.body as Record<string, string>;
+    if (!first_name || !username || !password) {
+      res.status(400).json({ status: false, msg: 'first_name, username, and password are required' });
+      return;
+    }
+    try {
+      const result = await userService.inviteTeamMember(res.locals.userId!, { first_name, last_name, username, password });
+      res.status(200).json({ status: true, msg: 'Team member invited successfully', data: result });
+    } catch (err) {
+      res.status(400).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async removeTeamMember(req: Request, res: Response): Promise<void> {
+    const memberId = Number(req.params.userId);
+    if (!memberId) {
+      res.status(400).json({ status: false, msg: 'userId param is required' });
+      return;
+    }
+    try {
+      await userService.removeTeamMember(res.locals.userId!, memberId);
+      res.status(200).json({ status: true, msg: 'Team member removed' });
+    } catch (err) {
+      res.status(400).json({ status: false, msg: (err as Error).message });
+    }
+  }
 }
 
 export const userController = new UserController();

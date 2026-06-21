@@ -19,4 +19,5 @@ export interface UserBasicData {
 export interface UserLoginResponse {
   user_basic_data: UserBasicData;
   token: string;
+  role: string;
 }
