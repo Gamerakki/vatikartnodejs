@@ -80,9 +80,6 @@ export const inventoryItemSchema = z.object({
   size_option_id: z.number().gt(0).nullable().optional(),
   color_option_id: z.number().gt(0).nullable().optional(),
   quantity: z.number().min(0),
-}).refine((val) => val.size_option_id != null || val.color_option_id != null, {
-  message: 'Either size_option_id or color_option_id is required',
-  path: ['size_option_id'],
 });
 
 export const saveInventorySchema = z.object({

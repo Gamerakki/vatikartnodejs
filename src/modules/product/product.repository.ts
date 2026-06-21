@@ -568,7 +568,17 @@ export class ProductRepository {
           quantity: inventoryByCombo.get(key) || 0,
         });
       });
+      return combinations;
     }
+
+    const key = 'null:null';
+    combinations.push({
+      size_option_id: null,
+      color_option_id: null,
+      size_label: null,
+      color_label: null,
+      quantity: inventoryByCombo.get(key) || 0,
+    });
 
     return combinations;
   }
@@ -694,23 +704,8 @@ export class ProductRepository {
     }
 
     return await prisma.$transaction(async (tx) => {
-      let sizeOptions = product.variantOptions.filter((opt) => opt.optionType === 'size');
+      const sizeOptions = product.variantOptions.filter((opt) => opt.optionType === 'size');
       const colorOptions = product.variantOptions.filter((opt) => opt.optionType === 'color');
-
-      // Fallback: If no size variants exist, create a default "One Size" variant option.
-      if (sizeOptions.length === 0 && colorOptions.length === 0) {
-        const newOption = await tx.productVariantOption.create({
-          data: {
-            productId: prodBig,
-            optionType: 'size',
-            label: 'One Size',
-            isSet: false,
-            setQuantity: 1,
-            sortOrder: 0,
-          },
-        });
-        sizeOptions = [newOption];
-      }
 
       const combinations: Array<{ sizeOptionId: bigint | null; colorOptionId: bigint | null }> = [];
       if (sizeOptions.length > 0 && colorOptions.length > 0) {
@@ -723,10 +718,12 @@ export class ProductRepository {
         sizeOptions.forEach((sizeOpt) => {
           combinations.push({ sizeOptionId: sizeOpt.optionId, colorOptionId: null });
         });
-      } else {
+      } else if (colorOptions.length > 0) {
         colorOptions.forEach((colorOpt) => {
           combinations.push({ sizeOptionId: null, colorOptionId: colorOpt.optionId });
         });
+      } else {
+        combinations.push({ sizeOptionId: null, colorOptionId: null });
       }
 
       if (combinations.length === 0) {

@@ -208,16 +208,9 @@ export class ProductService {
       }, []);
 
       if (p.stock > 0) {
-        await productRepository.saveVariantOptions(Number(saved.productId), p.companyId, [
-          { optionType: 'size', label: 'Free Size', accent: null, sortOrder: 0 }
+        await productRepository.saveInventory(Number(saved.productId), p.companyId, [
+          { sizeOptionId: null, colorOptionId: null, quantity: p.stock }
         ]);
-        const data = await productRepository.fetchBasicInfo(Number(saved.productId), p.companyId);
-        const opt = data?.variants.find(v => v.optionType === 'size' && v.label === 'Free Size');
-        if (opt) {
-          await productRepository.saveInventory(Number(saved.productId), p.companyId, [
-            { sizeOptionId: Number(opt.optionId), colorOptionId: null, quantity: p.stock }
-          ]);
-        }
       }
     }
 
