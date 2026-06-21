@@ -15,6 +15,8 @@ export interface R2UploadURL {
 export interface CreateProduct {
   product: string;
   img_paths: string[];
+  video_paths?: string[];
+  video_duration_seconds?: number | null;
 }
 
 export interface CreateProductBatchReq {
@@ -26,6 +28,7 @@ export interface SaveProductRes {
   product_id: number;
   product: string;
   img_paths: string[];
+  video_paths?: string[];
   slug: string | null;
 }
 

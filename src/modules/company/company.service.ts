@@ -1,6 +1,7 @@
 import { companyRepository } from './company.repository';
 import { SaveCompany, SaveSocialMediaBatchReq, CompanyData, SaveCompanySupportContactDetailsReq, CompanySupportContactDetailsRes, SaveCompanySalesContactDetailsReq, CompanySalesContactDetailsRes } from './company.interface';
 import { uploadFile, deleteFromR2 } from '../../utils/s3';
+import { getCompanyPlanUsage } from '../../utils/subscriptionLimits';
 
 export class CompanyService {
   async saveCompany(
@@ -67,7 +68,24 @@ export class CompanyService {
   }
 
   async fetchCompanyDataViaUserId(loggedInUserId: number): Promise<CompanyData | null> {
-    return await companyRepository.fetchCompanyDataViaUserId(loggedInUserId);
+    const companyData = await companyRepository.fetchCompanyDataViaUserId(loggedInUserId);
+    if (!companyData) return null;
+
+    const usage = await getCompanyPlanUsage(companyData.company_id);
+
+    return {
+      ...companyData,
+      subscription_info: {
+        plan: usage.plan,
+        products_used: usage.productsUsed,
+        max_products: usage.maxProducts,
+        categories_used: usage.categoriesUsed,
+        max_categories: usage.maxCategories,
+        users_used: usage.usersUsed,
+        max_users: usage.maxUsers,
+        access_control: usage.accessControl,
+      },
+    };
   }
 
   async saveCompanySupportDetails(

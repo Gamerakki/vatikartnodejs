@@ -32,6 +32,16 @@ export interface CompanyData {
   subdomain?: string | null;
   watermark_enabled?: boolean;
   policies?: string | null;
+  subscription_info?: {
+    plan: string;
+    products_used: number;
+    max_products: number;
+    categories_used: number;
+    max_categories: number;
+    users_used: number;
+    max_users: number;
+    access_control: boolean;
+  };
 }
 
 export interface SaveCompanySupportContactDetailsReq {

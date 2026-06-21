@@ -31,6 +31,19 @@ export class ProductRepository {
     });
   }
 
+  async saveBulkProductVideos(
+    videos: { productId: number; productVideoPath: string }[]
+  ) {
+    if (videos.length === 0) return;
+
+    await prisma.productVideo.createMany({
+      data: videos.map((video) => ({
+        productId: BigInt(video.productId),
+        productVideoPath: video.productVideoPath,
+      })),
+    });
+  }
+
   async fetchProductsByCatalogue(
     catalogueId: number,
     companyId: number

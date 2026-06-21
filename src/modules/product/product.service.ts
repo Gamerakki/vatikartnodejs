@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import path from 'path';
+import { prisma } from '../../config/database';
 import { productRepository } from './product.repository';
 import { companyRepository } from '../company/company.repository';
 import ExcelJS from 'exceljs';
@@ -19,6 +20,7 @@ import {
   ShopInventoryStatsRes,
 } from './product.interface';
 import { generatePresignedUploadURL, uploadToR2 } from '../../utils/s3';
+import { getCompanyPlanLimits } from '../../utils/subscriptionLimits';
 
 export class ProductService {
   async bulkImportProducts(loggedInUserId: number, catalogueId: number, file: Express.Multer.File): Promise<any> {
@@ -147,6 +149,12 @@ export class ProductService {
       });
     });
 
+    const limits = await getCompanyPlanLimits(companyId);
+    const currentCount = await prisma.product.count({ where: { companyId: BigInt(companyId), isDeleted: false } });
+    if (currentCount + productsToCreate.length > limits.maxProducts) {
+      throw new Error(`Limit Exceeded: Your plan allows a maximum of ${limits.maxProducts} products.`);
+    }
+
     const uploadResults = await Promise.all(imageUploadPromises);
     const imageKeyMap = new Map<number, string>();
     for (const res of uploadResults) {
@@ -249,6 +257,27 @@ export class ProductService {
   ): Promise<SaveProductRes[]> {
     const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
 
+    const limits = await getCompanyPlanLimits(companyId);
+    const currentCount = await prisma.product.count({ where: { companyId: BigInt(companyId), isDeleted: false } });
+    if (currentCount + req.products.length > limits.maxProducts) {
+      throw new Error(`Limit Exceeded: Your plan allows a maximum of ${limits.maxProducts} products.`);
+    }
+
+    req.products.forEach((product) => {
+      if ((product.img_paths || []).length > 3) {
+        throw new Error('A product can have at most 3 images.');
+      }
+      if ((product.video_paths || []).length > 1) {
+        throw new Error('A product can have at most 1 video.');
+      }
+      if ((product.video_paths || []).length > 0) {
+        const duration = Number(product.video_duration_seconds || 0);
+        if (duration < 10 || duration > 15) {
+          throw new Error('Video must be between 10 to 15 seconds long.');
+        }
+      }
+    });
+
     const productsData = req.products.map((p) => ({
       companyId,
       catalogueId: req.catalogue_id,
@@ -259,6 +288,7 @@ export class ProductService {
     const savedProducts = await productRepository.createProducts(productsData);
 
     const imageEntries: { productId: number; productImgPath: string }[] = [];
+    const videoEntries: { productId: number; productVideoPath: string }[] = [];
     savedProducts.forEach((saved, index) => {
       const paths = req.products[index].img_paths || [];
       paths.forEach((path) => {
@@ -267,14 +297,23 @@ export class ProductService {
           productImgPath: path,
         });
       });
+      const videoPaths = req.products[index].video_paths || [];
+      videoPaths.forEach((videoPath) => {
+        videoEntries.push({
+          productId: Number(saved.productId),
+          productVideoPath: videoPath,
+        });
+      });
     });
 
     await productRepository.saveBulkProductImages(imageEntries);
+    await productRepository.saveBulkProductVideos(videoEntries);
 
     return savedProducts.map((saved, index) => ({
       product_id: Number(saved.productId),
       product: saved.product,
       img_paths: req.products[index].img_paths,
+      video_paths: req.products[index].video_paths || [],
       slug: saved.slug,
     }));
   }

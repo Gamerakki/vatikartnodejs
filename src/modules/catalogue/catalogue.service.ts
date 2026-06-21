@@ -1,10 +1,12 @@
 import { catalogueRepository } from './catalogue.repository';
 import { companyRepository } from '../company/company.repository';
 import { productRepository } from '../product/product.repository';
+import { prisma } from '../../config/database';
 import { customerGroupService } from '../customer-group/customerGroup.service';
 import { whatsappTemplateService } from '../whatsapp-template/whatsappTemplate.service';
 import { SaveCatalogueReq, SaveCatalogueRes, CatalogRes, CatalogueQueryParams, SoftDeleteRestoreCatalogueReq } from './catalogue.interface';
 import { sanitizeString, generateRandom12DigitString } from '../../utils/common';
+import { getCompanyPlanLimits } from '../../utils/subscriptionLimits';
 
 export class CatalogueService {
   async saveCatalogue(
@@ -14,6 +16,11 @@ export class CatalogueService {
     if (!req.catalogue_id) {
       // Creation
       const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
+      const limits = await getCompanyPlanLimits(companyId);
+      const count = await prisma.catalogue.count({ where: { companyId: BigInt(companyId), isDeleted: false } });
+      if (count + 1 > limits.maxCategories) {
+        throw new Error(`Limit Exceeded: Your plan allows a maximum of ${limits.maxCategories} categories.`);
+      }
       const slugName = `${sanitizeString(req.catalogue)}-${generateRandom12DigitString()}`;
 
       const res = await catalogueRepository.saveCatalogue({
@@ -204,6 +211,12 @@ export class CatalogueService {
 
   async updateCataloguePrivacy(loggedInUserId: number, catalogueId: number, privacyLevel: string): Promise<void> {
     const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
+    if (privacyLevel === 'PRIVATE' || privacyLevel === 'RESTRICTED') {
+      const limits = await getCompanyPlanLimits(companyId);
+      if (!limits.accessControl) {
+        throw new Error('Access Control features are only available in GOLD and DIAMOND plans.');
+      }
+    }
     await catalogueRepository.updateCataloguePrivacy(catalogueId, companyId, privacyLevel);
   }
 

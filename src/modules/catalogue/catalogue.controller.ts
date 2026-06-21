@@ -700,7 +700,9 @@ export class CatalogueController {
       await catalogueService.updateCataloguePrivacy(loggedInUserId, catalogueId, privacyLevel);
       res.status(200).json({ status: true, msg: 'Privacy updated successfully' });
     } catch (err) {
-      res.status(500).json({ status: false, msg: (err as Error).message });
+      const msg = (err as Error).message;
+      const httpStatus = msg === 'Access Control features are only available in GOLD and DIAMOND plans.' ? 403 : 500;
+      res.status(httpStatus).json({ status: false, msg });
     }
   }
 
