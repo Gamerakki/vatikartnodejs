@@ -354,6 +354,7 @@ export class ProductService {
         setName: req.set_name || null,
         minimumOrderQty: req.minimum_order_qty || null,
         updatedBy: loggedInUserId,
+        trackInventory: req.track_inventory ?? true,
       },
       slabs
     );
@@ -430,6 +431,7 @@ export class ProductService {
       set_name: product.setName,
       minimum_order_qty: product.minimumOrderQty,
       description: product.description,
+      track_inventory: product.trackInventory,
       bulk_discounts: slabs.map((s) => ({
         slab_id: Number(s.slabId),
         min_qty: s.minQty,

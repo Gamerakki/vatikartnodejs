@@ -158,6 +158,7 @@ model Product {
   catalogueId     BigInt    @map("catalogue_id")
   reorderLevel    Int       @default(5) @map("reorder_level")
   maxStock        Int       @default(100) @map("max_stock")
+  trackInventory  Boolean   @default(true) @map("track_inventory")
 
   // Relations
   company       Company   @relation(fields: [companyId], references: [companyId], onDelete: Cascade, onUpdate: Cascade)

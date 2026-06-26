@@ -54,6 +54,7 @@ export const saveBasicInfoSchema = z.object({
   minimum_order_qty: z.number().min(1).nullable().optional(),
   description: z.string().max(2000).nullable().optional(),
   bulk_discounts: z.array(bulkDiscountSlabSchema).nullable().optional(),
+  track_inventory: z.boolean().nullable().optional(),
 });
 
 export const variantOptionSchema = z.object({

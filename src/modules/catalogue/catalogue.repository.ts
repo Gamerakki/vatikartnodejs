@@ -580,6 +580,7 @@ export class CatalogueRepository {
             catalogueId: newCat.catalogueId,
             reorderLevel: p.reorderLevel,
             maxStock: p.maxStock,
+            trackInventory: p.trackInventory,
             addedDate: new Date(),
           },
         });

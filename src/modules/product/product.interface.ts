@@ -55,6 +55,7 @@ export interface ProductListItemRes {
   set_quantity?: number | null;
   set_name?: string | null;
   minimum_order_qty?: number | null;
+  track_inventory?: boolean;
 }
 
 export interface BulkDiscountSlabReq {
@@ -80,6 +81,7 @@ export interface SaveBasicInfoReq {
   minimum_order_qty?: number | null;
   description?: string | null;
   bulk_discounts?: BulkDiscountSlabReq[] | null;
+  track_inventory?: boolean | null;
 }
 
 export interface VariantOptionReq {
@@ -154,6 +156,7 @@ export interface BasicInfoRes {
   description: string | null;
   bulk_discounts: BulkDiscountSlabRes[];
   variants: ProductVariantsRes;
+  track_inventory: boolean;
 }
 
 export interface InventoryItemRes {

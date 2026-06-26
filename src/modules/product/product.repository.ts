@@ -123,6 +123,7 @@ export class ProductRepository {
         total_stock: totalStock,
         size_count: sizesOptions.length,
         description: p.description,
+        track_inventory: p.trackInventory,
         sizes: sizesOptions.map((o) => ({
           option_id: Number(o.optionId),
           label: o.label,
@@ -234,6 +235,7 @@ export class ProductRepository {
         total_stock: totalStock,
         size_count: sizesOptions.length,
         description: p.description,
+        track_inventory: p.trackInventory,
         sizes: sizesOptions.map((o) => ({
           option_id: Number(o.optionId),
           label: o.label,
@@ -285,6 +287,7 @@ export class ProductRepository {
       setName: string | null;
       minimumOrderQty: number | null;
       updatedBy: number;
+      trackInventory?: boolean;
     },
     slabs: {
       minQty: number;
@@ -319,6 +322,7 @@ export class ProductRepository {
           minimumOrderQty: product.minimumOrderQty,
           updatedBy: BigInt(product.updatedBy),
           updatedDate: new Date(),
+          trackInventory: product.trackInventory,
         },
       });
 

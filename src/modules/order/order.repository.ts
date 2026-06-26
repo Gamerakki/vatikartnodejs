@@ -15,8 +15,19 @@ function getServerItemPrice(
 ): number {
   let itemPrice = dbProduct.price ? Number(dbProduct.price) : 0;
 
+  let lastSlab: any = null;
+  let maxMinQty = -1;
   for (const slab of dbProduct.bulkDiscounts) {
-    if (qty >= slab.minQty && (slab.maxQty === null || qty <= slab.maxQty)) {
+    const min = Number(slab.minQty) || 0;
+    if (min > maxMinQty) {
+      maxMinQty = min;
+      lastSlab = slab;
+    }
+  }
+
+  for (const slab of dbProduct.bulkDiscounts) {
+    const max = (slab === lastSlab) ? null : (slab.maxQty != null ? Number(slab.maxQty) : null);
+    if (qty >= slab.minQty && (max === null || qty <= max)) {
       if (slab.discountedPrice != null) {
         const slabPrice = Number(slab.discountedPrice);
         if (slabPrice < itemPrice) {
