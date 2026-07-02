@@ -154,9 +154,8 @@ export class UserController {
     const userId: bigint = BigInt(res.locals.userId || 0);
     const { pushToken } = req.body as { pushToken?: string };
     const normalizedPushToken = typeof pushToken === 'string' ? pushToken.trim() : '';
-    const isExpoPushToken = /^Expo(?:nent)?PushToken\[[^\]]+\]$/.test(normalizedPushToken);
 
-    if (!isExpoPushToken) {
+    if (!normalizedPushToken) {
       res.status(400).json({ status: false, msg: 'Invalid or missing pushToken' });
       return;
     }
@@ -206,6 +205,37 @@ export class UserController {
       res.status(200).json({ status: true, msg: 'Team member removed' });
     } catch (err) {
       res.status(400).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async saveCustomerPushToken(req: Request, res: Response): Promise<void> {
+    const { phone, pushToken } = req.body as { phone?: string; pushToken?: string };
+    const normalizedPhone = typeof phone === 'string' ? phone.trim() : '';
+    const normalizedPushToken = typeof pushToken === 'string' ? pushToken.trim() : '';
+
+    if (!normalizedPhone || !normalizedPushToken) {
+      res.status(400).json({ status: false, msg: 'phone and pushToken are required' });
+      return;
+    }
+
+    try {
+      const { prisma } = await import('../../config/database');
+      await prisma.customerPushToken.upsert({
+        where: {
+          phone_pushToken: {
+            phone: normalizedPhone,
+            pushToken: normalizedPushToken,
+          },
+        },
+        create: {
+          phone: normalizedPhone,
+          pushToken: normalizedPushToken,
+        },
+        update: {},
+      });
+      res.status(200).json({ status: true, msg: 'Customer push token saved.' });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: 'An error occurred', error: (err as Error).message });
     }
   }
 }

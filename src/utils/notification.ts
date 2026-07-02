@@ -1,8 +1,9 @@
 import { prisma } from '../config/database';
+import { sendFcmNotification } from './firebase';
 
 /**
- * Look up the merchant (user) who owns a given company and send them an
- * Expo push notification if they have a registered push token.
+ * Look up the merchant (user) who owns a given company and send them a
+ * Firebase push notification if they have a registered push token.
  *
  * Fire-and-forget: callers should NOT await this when it is used as a
  * background side-effect inside a request handler.
@@ -20,22 +21,7 @@ export async function sendMerchantNotification(
 
     if (!user?.pushToken) return;
 
-    const response = await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to: user.pushToken,
-        channelId: 'default',
-        sound: 'default',
-        title,
-        body,
-      }),
-    });
-
-    if (!response.ok) {
-      const responseText = await response.text().catch(() => '');
-      console.warn('[notification] expo push rejected', response.status, responseText);
-    }
+    await sendFcmNotification(user.pushToken, title, body);
   } catch (err) {
     // Notification failure must never crash the main request
     console.warn('[notification] push failed', err);

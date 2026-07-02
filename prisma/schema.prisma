@@ -414,3 +414,14 @@ model WhatsAppTemplate {
 
   @@map("whatsapp_templates")
 }
+
+model CustomerPushToken {
+  id        BigInt   @id @default(autoincrement()) @map("id")
+  phone     String   @map("phone") @db.VarChar(15)
+  pushToken String   @map("push_token") @db.Text
+  addedDate DateTime @default(now()) @map("added_date") @db.Timestamptz
+
+  @@unique([phone, pushToken])
+  @@map("customer_push_tokens")
+}
+

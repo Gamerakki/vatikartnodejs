@@ -8,6 +8,7 @@ router.post('/register', validateNoAuth, userController.register);
 router.get('/check-email-address', validateOptionalAuth, userController.checkEmailAddress);
 router.post('/login', validateNoAuth, userController.login);
 router.get('/check-duplicate-username', validateOptionalAuth, userController.checkDuplicateUsername);
+router.post('/customer/push-token', userController.saveCustomerPushToken);
 
 // Authenticated routes
 router.get('/validate-token', validateAuth, userController.validateToken);
