@@ -64,7 +64,8 @@ model Company {
   policies         String?   @db.Text
   isDeleted        Boolean   @default(false) @map("is_deleted")
   subdomain        String?   @unique @map("subdomain") @db.VarChar(100)
-  watermarkEnabled Boolean   @default(false) @map("watermark_enabled")
+  watermarkEnabled    Boolean   @default(false) @map("watermark_enabled")
+  showDownloadButtons Boolean   @default(true) @map("show_download_buttons")
 
   // Relations
   addedByUser   User? @relation("CompanyAddedBy", fields: [addedBy], references: [userId], onDelete: Cascade, onUpdate: Cascade)

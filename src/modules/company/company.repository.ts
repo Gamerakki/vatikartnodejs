@@ -110,6 +110,7 @@ export class CompanyRepository {
         salesPhone: true,
         supportPhone: true,
         policies: true,
+        showDownloadButtons: true,
         catalogues: {
           where: {
             isDeleted: false,
@@ -161,6 +162,7 @@ export class CompanyRepository {
       sales_phone: company.salesPhone,
       support_phone: company.supportPhone,
       policies: company.policies,
+      show_download_buttons: company.showDownloadButtons,
       catalogues: company.catalogues.map((c) => {
         let cover_image = null;
         if (c.products.length > 0 && c.products[0].images.length > 0) {
@@ -249,6 +251,7 @@ export class CompanyRepository {
         logoImgPath: true,
         subdomain: true,
         watermarkEnabled: true,
+        showDownloadButtons: true,
         policies: true,
       },
     });
@@ -268,6 +271,7 @@ export class CompanyRepository {
       logo_img_path: company.logoImgPath,
       subdomain: company.subdomain || null,
       watermark_enabled: company.watermarkEnabled,
+      show_download_buttons: company.showDownloadButtons,
       policies: company.policies || null,
     };
   }
@@ -276,6 +280,13 @@ export class CompanyRepository {
     await prisma.company.updateMany({
       where: { addedBy: BigInt(userId), isDeleted: false },
       data: { watermarkEnabled: enabled },
+    });
+  }
+
+  async updateShowDownloadButtons(userId: number, enabled: boolean): Promise<void> {
+    await prisma.company.updateMany({
+      where: { addedBy: BigInt(userId), isDeleted: false },
+      data: { showDownloadButtons: enabled },
     });
   }
 

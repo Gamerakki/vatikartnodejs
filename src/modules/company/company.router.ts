@@ -23,6 +23,7 @@ router.get('/fetch-support-contact-details', companyController.fetchCompanySuppo
 router.patch('/save-sales-contact-details', requireOwner, companyController.saveCompanySalesContactDetails);
 router.get('/fetch-sales-contact-details', companyController.fetchCompanySalesContactDetails);
 router.patch('/watermark', requireOwner, companyController.updateWatermark);
+router.patch('/download-options', requireOwner, companyController.updateDownloadOptions);
 router.get('/policies', companyController.fetchCompanyPolicies);
 router.patch('/policies', requireOwner, companyController.updateCompanyPolicies);
 

@@ -262,6 +262,21 @@ export class CompanyController {
     }
   }
 
+  async updateDownloadOptions(req: Request, res: Response): Promise<void> {
+    const loggedInUserId = res.locals.userId || 0;
+    const { showDownloadButtons } = req.body as { showDownloadButtons?: boolean };
+    if (typeof showDownloadButtons !== 'boolean') {
+      res.status(400).json({ status: false, msg: 'showDownloadButtons must be a boolean' });
+      return;
+    }
+    try {
+      await companyRepository.updateShowDownloadButtons(loggedInUserId, showDownloadButtons);
+      res.status(200).json({ status: true, msg: `Download options ${showDownloadButtons ? 'enabled' : 'disabled'}.` });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: 'An error occurred', error: (err as Error).message });
+    }
+  }
+
   async fetchCompanyPolicies(req: Request, res: Response): Promise<void> {
     const loggedInUserId = res.locals.userId || 0;
 

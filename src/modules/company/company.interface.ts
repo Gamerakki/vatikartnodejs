@@ -31,6 +31,7 @@ export interface CompanyData {
   logo_img_path: string | null;
   subdomain?: string | null;
   watermark_enabled?: boolean;
+  show_download_buttons?: boolean;
   policies?: string | null;
   subscription_info?: {
     plan: string;
