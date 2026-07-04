@@ -10,7 +10,9 @@
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
     "dbapp": "npm start --prefix ../VatiKart/dbui",
-    "test": "jest"
+    "test": "jest",
+    "db:backup": "bash scripts/backup.sh",
+    "db:backup:firebase": "node scripts/backup_to_firebase.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.500.0",
