@@ -12,7 +12,8 @@
     "dbapp": "npm start --prefix ../VatiKart/dbui",
     "test": "jest",
     "db:backup": "bash scripts/backup.sh",
-    "db:backup:firebase": "node scripts/backup_to_firebase.js"
+    "db:backup:firebase": "node scripts/backup_to_firebase.js",
+    "db:backup:r2": "node scripts/backup_to_r2.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.500.0",
