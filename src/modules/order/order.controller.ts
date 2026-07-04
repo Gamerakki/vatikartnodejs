@@ -4,12 +4,27 @@ import { orderService } from './order.service';
 import { sendBrevoMailViaAPI } from '../../utils/mailer';
 import { companyRepository } from '../company/company.repository';
 import { getUserIdByCompanyId, sendMerchantNotification } from '../../utils/notification';
+import { prisma } from '../../config/database';
 import {
   updateOrderStatusSchema,
   updateOrderDiscountSchema,
   updateOrderShippingSchema,
   bookOrderSchema,
 } from './order.validation';
+
+async function downloadBrochureImage(url: string): Promise<Buffer | null> {
+  if (!url) return null;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!response.ok) return null;
+    return Buffer.from(await response.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
 
 export class OrderController {
   async fetchPublicOrdersByCustomerPhone(req: Request, res: Response): Promise<void> {
@@ -449,6 +464,96 @@ export class OrderController {
       res.status(200).json({ status: true, msg: 'Activity tracked and notification sent.' });
     } catch (err) {
       res.status(500).json({ status: false, msg: 'An error occurred', error: (err as Error).message });
+    }
+  }
+
+  async exportCatalogueBrochurePdf(req: Request, res: Response): Promise<void> {
+    const loggedInUserId = res.locals.userId || 0;
+    const catalogueId = Number(req.params.catalogue_id);
+
+    if (!Number.isFinite(catalogueId) || catalogueId <= 0) {
+      res.status(400).json({ status: false, msg: 'Invalid catalogue_id' });
+      return;
+    }
+
+    try {
+      const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
+      if (!companyId) {
+        res.status(404).json({ status: false, msg: 'Company profile not found.' });
+        return;
+      }
+
+      const company = await companyRepository.fetchCompanyDataViaUserId(loggedInUserId);
+      const catalogue = await prisma.catalogue.findFirst({
+        where: {
+          catalogueId: BigInt(catalogueId),
+          companyId: BigInt(companyId),
+          isDeleted: false,
+        },
+        include: {
+          products: {
+            where: { isDeleted: false },
+            orderBy: { productId: 'desc' },
+          },
+        },
+      });
+
+      if (!catalogue) {
+        res.status(404).json({ status: false, msg: 'Catalogue not found.' });
+        return;
+      }
+
+      const companyName = company?.company_name || 'VatiKart Store';
+      const subdomain = company?.subdomain || 'abc-ltd';
+      const scanUrl = `https://${subdomain}.shop.vatikart.in/?catalogue=${catalogueId}`;
+      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(scanUrl)}`;
+      const qrBuffer = await downloadBrochureImage(qrCodeUrl);
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="brochure-${catalogueId}.pdf"`);
+
+      const doc = new PDFDocument({ size: 'A4', margin: 36 });
+      doc.pipe(res);
+
+      doc.fontSize(22).text(companyName, { align: 'center' });
+      doc.fontSize(12).text(catalogue.catalogue || 'Catalogue Brochure', { align: 'center' });
+      doc.moveDown(2);
+
+      const itemsPerRow = 2;
+      const cardWidth = 240;
+      const cardHeight = 320;
+      let startX = 36;
+      let startY = doc.y;
+
+      catalogue.products.forEach((prod, index) => {
+        if (index > 0 && index % itemsPerRow === 0) {
+          startX = 36;
+          startY += cardHeight + 20;
+          if (startY + cardHeight > doc.page.height - doc.page.margins.bottom) {
+            doc.addPage();
+            startY = doc.page.margins.top;
+          }
+        } else if (index > 0) {
+          startX = doc.page.width - cardWidth - 36;
+        }
+
+        doc.rect(startX, startY, cardWidth, cardHeight).stroke('#E2E8F0');
+        doc.fontSize(12).fillColor('#1E293B').text(prod.product, startX + 10, startY + 10, { width: cardWidth - 20, height: 35 });
+        doc.fontSize(10).fillColor('#0D9488').text(`Price: ₹${Number(prod.price || 0)}`, startX + 10, startY + 45);
+        doc.fontSize(8).fillColor('#64748B').text('Scan to order online', startX + 10, startY + 70);
+
+        if (qrBuffer) {
+          try {
+            doc.image(qrBuffer, startX + 50, startY + 95, { width: 140, height: 140 });
+          } catch {
+            doc.fontSize(8).fillColor('#64748B').text('QR unavailable', startX + 10, startY + 95);
+          }
+        }
+      });
+
+      doc.end();
+    } catch (err) {
+      res.status(500).json({ status: false, msg: 'Failed compiling pdf brochure', error: (err as Error).message });
     }
   }
 }
