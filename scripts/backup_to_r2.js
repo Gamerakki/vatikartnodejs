@@ -4,8 +4,8 @@ const { URL } = require('url');
 const path = require('path');
 const fs = require('fs');
 
-// Load environment variables from .env
-require('dotenv').config();
+// Load environment variables from .env using an absolute path relative to the script
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 const bucketName = process.env.BUCKET || 'vatikart';
 const s3Client = new S3Client({
