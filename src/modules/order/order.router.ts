@@ -16,5 +16,7 @@ router.get('/fetch-data/:order_id', orderController.fetchOrderById);
 router.patch('/update-status', orderController.updateOrderStatus);
 router.patch('/update-discount', orderController.updateOrderDiscount);
 router.patch('/update-shipping', orderController.updateOrderShipping);
+router.get('/export/pdf/:order_id', orderController.exportOrderPdf);
+router.post('/export/pdf/email/:order_id', orderController.emailOrderPdf);
 
 export const orderRouter = router;

@@ -13,8 +13,10 @@ export interface MailRecipient {
 export interface BrevoMailPayload {
   sender?: MailSender;
   to: MailRecipient[];
-  templateId: number;
-  params: Record<string, string>;
+  templateId?: number;
+  params?: Record<string, string>;
+  subject?: string;
+  htmlContent?: string;
 }
 
 export async function sendBrevoMailViaAPI(payload: BrevoMailPayload): Promise<void> {
@@ -31,12 +33,23 @@ export async function sendBrevoMailViaAPI(payload: BrevoMailPayload): Promise<vo
     throw new Error('brevo mail sender email id is required');
   }
 
-  const formattedPayload = {
-    sender: { name: senderName, email: senderEmail },
-    to: payload.to,
-    templateId: payload.templateId,
-    params: payload.params,
-  };
+  const formattedPayload = payload.templateId
+    ? {
+        sender: { name: senderName, email: senderEmail },
+        to: payload.to,
+        templateId: payload.templateId,
+        params: payload.params ?? {},
+      }
+    : {
+        sender: { name: senderName, email: senderEmail },
+        to: payload.to,
+        subject: payload.subject,
+        htmlContent: payload.htmlContent,
+      };
+
+  if (!payload.templateId && (!payload.subject || !payload.htmlContent)) {
+    throw new Error('Either templateId or subject+htmlContent is required');
+  }
 
   try {
     const response = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -53,7 +66,11 @@ export async function sendBrevoMailViaAPI(payload: BrevoMailPayload): Promise<vo
       throw new Error(`Brevo API returned error: ${response.status} - ${errorText}`);
     }
 
-    logger.info(`Email sent successfully via Brevo template ${payload.templateId}`);
+    logger.info(
+      payload.templateId
+        ? `Email sent successfully via Brevo template ${payload.templateId}`
+        : 'Transactional email sent successfully via Brevo',
+    );
   } catch (err) {
     logger.error('Error sending Brevo email', err);
     throw err;
