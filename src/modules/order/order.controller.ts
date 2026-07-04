@@ -3,6 +3,7 @@ import PDFDocument from 'pdfkit';
 import { orderService } from './order.service';
 import { sendBrevoMailViaAPI } from '../../utils/mailer';
 import { companyRepository } from '../company/company.repository';
+import { getUserIdByCompanyId, sendMerchantNotification } from '../../utils/notification';
 import {
   updateOrderStatusSchema,
   updateOrderDiscountSchema,
@@ -395,6 +396,59 @@ export class OrderController {
         msg: status === 404 ? msg : 'An error occurred sending email',
         error: msg,
       });
+    }
+  }
+
+  async trackStorefrontActivity(req: Request, res: Response): Promise<void> {
+    const { buyerName, buyerPhone, activityType, details, companyId } = req.body as {
+      buyerName: string;
+      buyerPhone: string;
+      activityType: string;
+      details: string;
+      companyId: number;
+    };
+
+    if (!buyerName || !buyerPhone || !activityType || !companyId) {
+      res.status(400).json({ status: false, msg: 'Missing required parameters.' });
+      return;
+    }
+
+    const normalizedPhone = buyerPhone.replace(/\D/g, '');
+
+    try {
+      const merchantUserId = await getUserIdByCompanyId(BigInt(companyId));
+      if (!merchantUserId) {
+        res.status(404).json({ status: false, msg: 'Merchant not found.' });
+        return;
+      }
+
+      let title = '👀 Activity Alert';
+      let body = `${buyerName} (${normalizedPhone}) is active on your store.`;
+
+      if (activityType === 'view_product') {
+        title = '👀 Product Viewed!';
+        body = `${buyerName} (${normalizedPhone}) is viewing: ${details}`;
+      } else if (activityType === 'add_to_cart') {
+        title = '🛒 Added to Cart!';
+        body = `${buyerName} (${normalizedPhone}) added to cart: ${details}`;
+      }
+
+      await sendMerchantNotification(
+        merchantUserId,
+        title,
+        body,
+        {
+          type: 'BUYER_ACTIVITY',
+          buyerName,
+          buyerPhone: normalizedPhone,
+          details: details || '',
+          activityType,
+        },
+      );
+
+      res.status(200).json({ status: true, msg: 'Activity tracked and notification sent.' });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: 'An error occurred', error: (err as Error).message });
     }
   }
 }

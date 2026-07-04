@@ -12,6 +12,7 @@ export async function sendMerchantNotification(
   userId: bigint,
   title: string,
   body: string,
+  data: Record<string, string> = {},
 ): Promise<void> {
   try {
     const user = await prisma.user.findUnique({
@@ -21,7 +22,12 @@ export async function sendMerchantNotification(
 
     if (!user?.pushToken) return;
 
-    await sendFcmNotification(user.pushToken, title, body);
+    const stringData: Record<string, string> = {};
+    for (const [key, value] of Object.entries(data)) {
+      stringData[key] = String(value);
+    }
+
+    await sendFcmNotification(user.pushToken, title, body, stringData);
   } catch (err) {
     // Notification failure must never crash the main request
     console.warn('[notification] push failed', err);
