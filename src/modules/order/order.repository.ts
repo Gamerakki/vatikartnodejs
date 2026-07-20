@@ -1,5 +1,6 @@
 import { prisma } from '../../config/database';
 import { OrderItemRes, OrderDetailRes, OrderStatus } from './order.interface';
+import { customerGroupRepository } from '../customer-group/customerGroup.repository';
 
 function getServerItemPrice(
   dbProduct: {
@@ -356,6 +357,19 @@ export class OrderRepository {
       let calculatedDiscountedSubtotal = 0;
       const resellerMarkup = Number(data.reseller_markup || 0);
       const multiplier = resellerMarkup > 0 ? (1 + resellerMarkup / 100) : 1;
+      const normalizedCustomerPhone = data.customer_phone.replace(/\D/g, '');
+
+      let groupPriceMap = new Map<number, number>();
+      const customerGroup = await customerGroupRepository.resolveGroupByPhone(
+        Number(catalogue.companyId),
+        normalizedCustomerPhone,
+      );
+      if (customerGroup) {
+        groupPriceMap = await customerGroupRepository.fetchPriceMapForGroup(
+          customerGroup.id,
+          data.items.map((item) => item.product_id),
+        );
+      }
 
       // Compute aggregate quantity per product ID to resolve bulk pricing slabs correctly for multi-variant checkouts
       const aggregateQtyMap = new Map<number, number>();
@@ -376,13 +390,19 @@ export class OrderRepository {
         }
 
         // Calculate gross price (original retail price)
-        const basePrice = dbProduct.price ? Number(dbProduct.price) : 0;
+        const groupOverride = groupPriceMap.get(item.product_id);
+        const basePrice = groupOverride !== undefined
+          ? groupOverride
+          : (dbProduct.price ? Number(dbProduct.price) : 0);
         const grossPrice = Number((basePrice * multiplier).toFixed(2));
         calculatedGrossSubtotal += grossPrice * item.qty;
 
         // Calculate discounted price (slab B2B price)
         const aggQty = aggregateQtyMap.get(item.product_id) || item.qty;
-        const discountedPrice = getServerItemPrice(dbProduct, aggQty);
+        const productForPricing = groupOverride !== undefined
+          ? { ...dbProduct, price: groupOverride }
+          : dbProduct;
+        const discountedPrice = getServerItemPrice(productForPricing, aggQty);
         const markedUpPrice = Number((discountedPrice * multiplier).toFixed(2));
 
         if (Math.abs(Number(item.price) - markedUpPrice) > 0.5) {
@@ -428,7 +448,6 @@ export class OrderRepository {
       // Commit exact server calculations to DB
       data.subtotal = serverDiscountedSubtotal;
       data.total = serverTotal;
-      const normalizedCustomerPhone = data.customer_phone.replace(/\D/g, '');
 
       // 2. Create Order
       const newOrder = await tx.order.create({

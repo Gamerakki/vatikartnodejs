@@ -2,6 +2,8 @@ import { Router } from 'express';
 import multer from 'multer';
 import { companyController } from './company.controller';
 import { validateAuth, requireOwner } from '../../middlewares/auth';
+import { companyCustomerGroupRouter } from './companyCustomerGroup.router';
+import { whatsappTemplateController } from '../whatsapp-template/whatsappTemplate.controller';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -12,6 +14,11 @@ router.post('/business-enquiry', companyController.createBusinessEnquiry);
 
 // All company routes require auth
 router.use(validateAuth);
+
+router.use('/customer-groups', companyCustomerGroupRouter);
+
+router.get('/whatsapp-share-template', whatsappTemplateController.fetchProductShareTemplate.bind(whatsappTemplateController));
+router.post('/whatsapp-share-template', requireOwner, whatsappTemplateController.saveProductShareTemplate.bind(whatsappTemplateController));
 
 // Note: multipart form handles logo upload
 router.post('/save', requireOwner, upload.single('logo_img_path'), companyController.saveCompany);

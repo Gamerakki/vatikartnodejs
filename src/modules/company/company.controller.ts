@@ -252,6 +252,8 @@ export class CompanyController {
 
   async resolveSubdomain(req: Request, res: Response): Promise<void> {
     const { subdomain } = req.params;
+    const customerPhone = typeof req.query.customer_phone === 'string' ? req.query.customer_phone : null;
+
     if (!subdomain) {
       res.status(400).json({
         status: false,
@@ -261,7 +263,7 @@ export class CompanyController {
     }
 
     try {
-      const result = await companyService.resolveSubdomain(subdomain.toLowerCase().trim());
+      const result = await companyService.resolveSubdomain(subdomain.toLowerCase().trim(), customerPhone);
       if (!result) {
         res.status(404).json({
           status: false,

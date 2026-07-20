@@ -144,15 +144,22 @@ export class CustomerGroupRepository {
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.groupPrice.deleteMany({ where: { groupId: BigInt(groupId) } });
-
-      if (items.length > 0) {
-        await tx.groupPrice.createMany({
-          data: items.map((item) => ({
+      for (const item of items) {
+        await tx.groupPrice.upsert({
+          where: {
+            groupId_productId: {
+              groupId: BigInt(groupId),
+              productId: BigInt(item.product_id),
+            },
+          },
+          update: {
+            customPrice: item.custom_price,
+          },
+          create: {
             groupId: BigInt(groupId),
             productId: BigInt(item.product_id),
             customPrice: item.custom_price,
-          })),
+          },
         });
       }
     });

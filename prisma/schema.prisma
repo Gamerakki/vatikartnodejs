@@ -133,6 +133,7 @@ model Catalogue {
 
   visitorMappers CatalogueVisitorMapper[]
   accessRequests CustomerAccessRequest[]
+  groupAccess    CatalogGroupAccess[]
 
   @@map("catalogues")
 }
@@ -374,9 +375,22 @@ model CustomerGroup {
   members        CustomerGroupMember[]
   accessRequests CustomerAccessRequest[]
   visitors       CatalogueVisitorMapper[]
+  catalogAccess  CatalogGroupAccess[]
 
   @@unique([companyId, name])
   @@map("customer_groups")
+}
+
+model CatalogGroupAccess {
+  id        BigInt @id @default(autoincrement())
+  catalogId BigInt @map("catalog_id")
+  groupId   BigInt @map("group_id")
+
+  catalog Catalogue     @relation(fields: [catalogId], references: [catalogueId], onDelete: Cascade)
+  group   CustomerGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([catalogId, groupId])
+  @@map("catalog_group_access")
 }
 
 model CustomerGroupMember {
@@ -410,6 +424,7 @@ model WhatsAppTemplate {
   id               BigInt @id @default(autoincrement())
   companyId        BigInt @unique @map("company_id")
   catalogShareText String @default("Check out our catalog: {link}") @map("catalog_share_text") @db.Text
+  productShareText String @default("Hey! Check out *{product_name}*\nPrice: {price}\nBuy online here: {link}") @map("product_share_text") @db.VarChar(1000)
   orderConfirmText String @default("Your order {order_id} of total {total} is confirmed!") @map("order_confirm_text") @db.Text
 
   company Company @relation(fields: [companyId], references: [companyId], onDelete: Cascade)

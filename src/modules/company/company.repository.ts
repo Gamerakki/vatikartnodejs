@@ -1,4 +1,5 @@
 import { prisma } from '../../config/database';
+import { customerGroupRepository } from '../customer-group/customerGroup.repository';
 
 export class CompanyRepository {
   async generateUniqueSubdomain(companyName: string, userId: bigint): Promise<string> {
@@ -103,7 +104,7 @@ export class CompanyRepository {
     });
   }
 
-  async resolveSubdomain(subdomain: string) {
+  async resolveSubdomain(subdomain: string, customerPhone: string | null = null) {
     const company = await prisma.company.findFirst({
       where: {
         OR: [
@@ -170,6 +171,11 @@ export class CompanyRepository {
 
     if (!company) return null;
 
+    let customerGroup: { id: number; name: string } | null = null;
+    if (customerPhone) {
+      customerGroup = await customerGroupRepository.resolveGroupByPhone(Number(company.companyId), customerPhone);
+    }
+
     return {
       company_id: Number(company.companyId),
       company_name: company.companyName,
@@ -184,6 +190,7 @@ export class CompanyRepository {
       email: company.email,
       support_email: company.supportEmail,
       sales_email: company.salesEmail,
+      customer_group: customerGroup,
       catalogues: company.catalogues.map((c) => {
         let cover_image = null;
         if (c.products.length > 0 && c.products[0].images.length > 0) {

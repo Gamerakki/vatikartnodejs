@@ -158,8 +158,8 @@ export class CompanyService {
     return await companyRepository.fetchCompanySalesContactDetails(companyId);
   }
 
-  async resolveSubdomain(subdomain: string) {
-    return await companyRepository.resolveSubdomain(subdomain);
+  async resolveSubdomain(subdomain: string, customerPhone: string | null = null) {
+    return await companyRepository.resolveSubdomain(subdomain, customerPhone);
   }
 
   async fetchCompanyPolicies(loggedInUserId: number): Promise<{ policies: string | null }> {
