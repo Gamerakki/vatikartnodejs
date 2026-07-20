@@ -1,51 +1,13 @@
 import { prisma } from '../../config/database';
 import { OrderItemRes, OrderDetailRes, OrderStatus } from './order.interface';
 import { customerGroupRepository } from '../customer-group/customerGroup.repository';
-
-function getServerItemPrice(
-  dbProduct: {
-    price: any;
-    bulkDiscounts: Array<{
-      minQty: number;
-      maxQty: number | null;
-      discountedPrice: any;
-      discountPercent: any;
-    }>;
-  },
-  qty: number
-): number {
-  let itemPrice = dbProduct.price ? Number(dbProduct.price) : 0;
-
-  let lastSlab: any = null;
-  let maxMinQty = -1;
-  for (const slab of dbProduct.bulkDiscounts) {
-    const min = Number(slab.minQty) || 0;
-    if (min > maxMinQty) {
-      maxMinQty = min;
-      lastSlab = slab;
-    }
-  }
-
-  for (const slab of dbProduct.bulkDiscounts) {
-    const max = (slab === lastSlab) ? null : (slab.maxQty != null ? Number(slab.maxQty) : null);
-    if (qty >= slab.minQty && (max === null || qty <= max)) {
-      if (slab.discountedPrice != null) {
-        const slabPrice = Number(slab.discountedPrice);
-        if (slabPrice < itemPrice) {
-          itemPrice = slabPrice;
-        }
-      } else if (slab.discountPercent != null && dbProduct.price != null) {
-        const pct = Number(slab.discountPercent);
-        if (pct > 0) {
-          const basePrice = Number(dbProduct.price);
-          itemPrice = basePrice * (1 - pct / 100);
-        }
-      }
-    }
-  }
-
-  return Number(itemPrice.toFixed(2));
-}
+import {
+  assertClientItemPrice,
+  assertCouponDiscountPercent,
+  assertValidOrderQuantity,
+  getServerItemPrice,
+  resolveBaseUnitPrice,
+} from './order.pricing';
 
 export class OrderRepository {
   async fetchPublicOrdersByCustomerPhone(phone: string): Promise<any[]> {
@@ -383,31 +345,44 @@ export class OrderRepository {
           throw new Error(`Product ID ${item.product_id} not found`);
         }
 
-        // Validate MOQ (Minimum Order Quantity)
+        // Validate MOQ (Minimum Order Quantity) & quantity sanity
         const moq = dbProduct.minimumOrderQty ?? 0;
-        if (moq > 0 && item.qty < moq) {
-          throw new Error(`Product "${dbProduct.product}" requires a minimum order of ${moq} units.`);
-        }
+        assertValidOrderQuantity(item.qty, moq, dbProduct.product);
 
         // Calculate gross price (original retail price)
         const groupOverride = groupPriceMap.get(item.product_id);
-        const basePrice = groupOverride !== undefined
-          ? groupOverride
-          : (dbProduct.price ? Number(dbProduct.price) : 0);
+        const basePrice = resolveBaseUnitPrice(
+          dbProduct.price != null ? Number(dbProduct.price) : null,
+          groupOverride,
+        );
         const grossPrice = Number((basePrice * multiplier).toFixed(2));
         calculatedGrossSubtotal += grossPrice * item.qty;
 
         // Calculate discounted price (slab B2B price)
         const aggQty = aggregateQtyMap.get(item.product_id) || item.qty;
         const productForPricing = groupOverride !== undefined
-          ? { ...dbProduct, price: groupOverride }
-          : dbProduct;
+          ? {
+              price: groupOverride,
+              bulkDiscounts: dbProduct.bulkDiscounts.map((slab) => ({
+                minQty: slab.minQty,
+                maxQty: slab.maxQty,
+                discountedPrice: slab.discountedPrice != null ? Number(slab.discountedPrice) : null,
+                discountPercent: slab.discountPercent != null ? Number(slab.discountPercent) : null,
+              })),
+            }
+          : {
+              price: dbProduct.price != null ? Number(dbProduct.price) : null,
+              bulkDiscounts: dbProduct.bulkDiscounts.map((slab) => ({
+                minQty: slab.minQty,
+                maxQty: slab.maxQty,
+                discountedPrice: slab.discountedPrice != null ? Number(slab.discountedPrice) : null,
+                discountPercent: slab.discountPercent != null ? Number(slab.discountPercent) : null,
+              })),
+            };
         const discountedPrice = getServerItemPrice(productForPricing, aggQty);
         const markedUpPrice = Number((discountedPrice * multiplier).toFixed(2));
 
-        if (Math.abs(Number(item.price) - markedUpPrice) > 0.5) {
-          throw new Error('Price validation failed; order rejected');
-        }
+        assertClientItemPrice(item.price, markedUpPrice);
 
         item.price = markedUpPrice;
         calculatedDiscountedSubtotal += markedUpPrice * item.qty;
@@ -418,10 +393,7 @@ export class OrderRepository {
       const volumeDiscountSavings = Number((serverGrossSubtotal - serverDiscountedSubtotal).toFixed(2));
       const couponDiscount = Number((data.discount - volumeDiscountSavings).toFixed(2));
 
-      const couponDiscountPercent = serverDiscountedSubtotal > 0 ? (couponDiscount / serverDiscountedSubtotal) : 0;
-      if (couponDiscountPercent > 0.20) {
-        throw new Error('Invalid discount value');
-      }
+      assertCouponDiscountPercent(couponDiscount, serverDiscountedSubtotal);
 
       let calculatedTax = 0;
       for (const item of data.items) {
@@ -431,6 +403,7 @@ export class OrderRepository {
         }
         const itemSubtotal = Number(item.price) * item.qty;
         const gstRate = dbProduct.gstRate ? Number(dbProduct.gstRate) : 0;
+        const couponDiscountPercent = serverDiscountedSubtotal > 0 ? (couponDiscount / serverDiscountedSubtotal) : 0;
         // Apply coupon discount effect before GST to match checkout calculations.
         calculatedTax += itemSubtotal * (gstRate / 100) * (1 - couponDiscountPercent);
       }
