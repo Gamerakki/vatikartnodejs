@@ -62,6 +62,7 @@ export class CompanyRepository {
     email?: string;
     currency?: string;
     upiId?: string;
+    customDomain?: string | null;
     addedBy: number;
     logoImgPath?: string;
   }) {
@@ -80,6 +81,7 @@ export class CompanyRepository {
         email: data.email || null,
         currency: data.currency || 'INR',
         upiId: data.upiId || null,
+        customDomain: data.customDomain !== undefined ? data.customDomain : undefined,
         updatedBy: userIdBig,
         updatedDate: now,
         ...(data.logoImgPath ? { logoImgPath: data.logoImgPath } : {}),
@@ -93,6 +95,7 @@ export class CompanyRepository {
         email: data.email || null,
         currency: data.currency || 'INR',
         upiId: data.upiId || null,
+        customDomain: data.customDomain || null,
         addedBy: userIdBig,
         logoImgPath: data.logoImgPath || null,
         subdomain,
@@ -101,16 +104,28 @@ export class CompanyRepository {
   }
 
   async resolveSubdomain(subdomain: string) {
-    const company = await prisma.company.findUnique({
-      where: { subdomain },
+    const company = await prisma.company.findFirst({
+      where: {
+        OR: [
+          { subdomain },
+          { customDomain: subdomain },
+        ],
+        isDeleted: false,
+      },
       select: {
         companyId: true,
         companyName: true,
+        tagline: true,
         logoImgPath: true,
         salesPhone: true,
         supportPhone: true,
         policies: true,
         showDownloadButtons: true,
+        address: true,
+        pincode: true,
+        email: true,
+        supportEmail: true,
+        salesEmail: true,
         catalogues: {
           where: {
             isDeleted: false,
@@ -158,11 +173,17 @@ export class CompanyRepository {
     return {
       company_id: Number(company.companyId),
       company_name: company.companyName,
+      tagline: company.tagline,
       logo_img_path: company.logoImgPath,
       sales_phone: company.salesPhone,
       support_phone: company.supportPhone,
       policies: company.policies,
       show_download_buttons: company.showDownloadButtons,
+      address: company.address,
+      pincode: company.pincode,
+      email: company.email,
+      support_email: company.supportEmail,
+      sales_email: company.salesEmail,
       catalogues: company.catalogues.map((c) => {
         let cover_image = null;
         if (c.products.length > 0 && c.products[0].images.length > 0) {
@@ -170,11 +191,11 @@ export class CompanyRepository {
         }
         return {
           catalogue_id: Number(c.catalogueId),
-          title: c.catalogue || 'Unnamed Catalogue',
+          catalogue_name: c.catalogue,
           privacy_level: c.privacyLevel,
           added_date: c.addedDate,
-          products_count: c._count.products,
           cover_image,
+          products_count: c._count.products,
         };
       }),
       catalogue_id: company.catalogues.length > 0 ? Number(company.catalogues[0].catalogueId) : null,
@@ -250,6 +271,7 @@ export class CompanyRepository {
         upiId: true,
         logoImgPath: true,
         subdomain: true,
+        customDomain: true,
         watermarkEnabled: true,
         showDownloadButtons: true,
         policies: true,
@@ -270,6 +292,7 @@ export class CompanyRepository {
       upi_id: company.upiId,
       logo_img_path: company.logoImgPath,
       subdomain: company.subdomain || null,
+      custom_domain: company.customDomain || null,
       watermark_enabled: company.watermarkEnabled,
       show_download_buttons: company.showDownloadButtons,
       policies: company.policies || null,

@@ -288,6 +288,7 @@ export class ProductRepository {
       minimumOrderQty: number | null;
       updatedBy: number;
       trackInventory?: boolean;
+      imgPaths?: string[];
     },
     slabs: {
       minQty: number;
@@ -343,6 +344,22 @@ export class ProductRepository {
             sortOrder: s.sortOrder,
           })),
         });
+      }
+
+      // Sync product images when provided
+      if (product.imgPaths) {
+        await tx.productImage.deleteMany({
+          where: { productId: productIdBig },
+        });
+
+        if (product.imgPaths.length > 0) {
+          await tx.productImage.createMany({
+            data: product.imgPaths.map((path) => ({
+              productId: productIdBig,
+              productImgPath: path,
+            })),
+          });
+        }
       }
     });
   }

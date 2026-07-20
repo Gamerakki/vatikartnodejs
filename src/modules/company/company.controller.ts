@@ -7,8 +7,46 @@ import {
   saveCompanySupportContactDetailsSchema,
   saveCompanySalesContactDetailsSchema,
 } from './company.validation';
+import { prisma } from '../../config/database';
+import { z } from 'zod';
+
+export const createBusinessEnquirySchema = z.object({
+  name: z.string().min(1, { message: 'Name is required' }),
+  business_name: z.string().min(1, { message: 'Business name is required' }),
+  phone: z.string().min(10, { message: 'Valid phone number is required' }),
+  email: z.string().email().nullable().optional(),
+  company_id: z.number().nullable().optional(),
+});
 
 export class CompanyController {
+  async createBusinessEnquiry(req: Request, res: Response): Promise<void> {
+    const parseResult = createBusinessEnquirySchema.safeParse(req.body);
+    if (!parseResult.success) {
+      res.status(400).json({ status: false, msg: parseResult.error.errors[0].message });
+      return;
+    }
+
+    try {
+      await prisma.businessEnquiry.create({
+        data: {
+          name: parseResult.data.name,
+          businessName: parseResult.data.business_name,
+          phone: parseResult.data.phone,
+          email: parseResult.data.email || null,
+          companyId: parseResult.data.company_id ? BigInt(parseResult.data.company_id) : null,
+        },
+      });
+
+      res.status(201).json({ status: true, msg: 'Enquiry submitted successfully' });
+    } catch (err) {
+      res.status(500).json({
+        status: false,
+        msg: 'An error occurred',
+        error: (err as Error).message,
+      });
+    }
+  }
+
   async saveCompany(req: Request, res: Response): Promise<void> {
     // fields from multipart form are in req.body
     const parseResult = saveCompanySchema.safeParse(req.body);

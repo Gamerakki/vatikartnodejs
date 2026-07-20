@@ -8,6 +8,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // Public route to resolve subdomain
 router.get('/resolve-subdomain/:subdomain', companyController.resolveSubdomain);
+router.post('/business-enquiry', companyController.createBusinessEnquiry);
 
 // All company routes require auth
 router.use(validateAuth);

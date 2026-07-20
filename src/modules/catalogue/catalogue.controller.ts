@@ -861,10 +861,12 @@ export class CatalogueController {
       const bannerText = (req.body.banner_text as string) || null;
       const bannerActive = req.body.banner_active === 'true' || req.body.banner_active === true;
 
-      let bannerImgPath: string | null = null;
+      let bannerImgPath: string | null | undefined = undefined;
       if (req.file) {
         const uploadedName = await uploadToR2('banners', req.file.buffer, req.file.originalname, req.file.mimetype);
         bannerImgPath = `banners/${uploadedName}`;
+      } else if (req.body.banner_image_removed === 'true' || req.body.banner_image_removed === true) {
+        bannerImgPath = null;
       }
 
       await catalogueService.updateCatalogueBanner(loggedInUserId, catalogueId, bannerText, bannerActive, bannerImgPath);

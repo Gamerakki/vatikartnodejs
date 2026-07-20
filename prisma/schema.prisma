@@ -64,6 +64,7 @@ model Company {
   policies         String?   @db.Text
   isDeleted        Boolean   @default(false) @map("is_deleted")
   subdomain        String?   @unique @map("subdomain") @db.VarChar(100)
+  customDomain     String?   @unique @map("custom_domain") @db.VarChar(100)
   watermarkEnabled    Boolean   @default(false) @map("watermark_enabled")
   showDownloadButtons Boolean   @default(true) @map("show_download_buttons")
 
@@ -79,6 +80,7 @@ model Company {
   subscription       Subscription?
   customerGroups     CustomerGroup[]
   whatsappTemplate   WhatsAppTemplate?
+  businessEnquiries  BusinessEnquiry[]
 
   @@map("company")
 }
@@ -423,5 +425,19 @@ model CustomerPushToken {
 
   @@unique([phone, pushToken])
   @@map("customer_push_tokens")
+}
+
+model BusinessEnquiry {
+  enquiryId    BigInt   @id @default(autoincrement()) @map("enquiry_id")
+  name         String   @map("name") @db.VarChar(150)
+  businessName String   @map("business_name") @db.VarChar(250)
+  phone        String   @map("phone") @db.VarChar(20)
+  email        String?  @map("email") @db.VarChar(254)
+  companyId    BigInt?  @map("company_id")
+  addedDate    DateTime @default(now()) @map("added_date") @db.Timestamptz
+
+  company Company? @relation(fields: [companyId], references: [companyId], onDelete: SetNull)
+
+  @@map("business_enquiries")
 }
 

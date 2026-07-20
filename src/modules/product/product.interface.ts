@@ -82,6 +82,7 @@ export interface SaveBasicInfoReq {
   description?: string | null;
   bulk_discounts?: BulkDiscountSlabReq[] | null;
   track_inventory?: boolean | null;
+  img_paths?: string[];
 }
 
 export interface VariantOptionReq {

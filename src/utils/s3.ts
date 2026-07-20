@@ -41,7 +41,7 @@ export function isValidFileType(
   if (!allowedExtensions[ext]) {
     return false;
   }
-  return !!allowedMimeTypes[mimeType];
+  return !!allowedMimeTypes[mimeType.toLowerCase()];
 }
 
 export async function uploadToR2(

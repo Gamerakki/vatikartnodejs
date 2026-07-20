@@ -13,7 +13,7 @@ export const productFileUploadSchema = z.object({
 
 export const createProductSchema = z.object({
   product: z.string().min(1, { message: 'The field product is required' }),
-  img_paths: z.array(z.string()).min(1, { message: 'The field img_paths must have at least 1 item' }).max(3, { message: 'A product can have at most 3 images' }),
+  img_paths: z.array(z.string()).min(1, { message: 'The field img_paths must have at least 1 item' }).max(20, { message: 'A product can have at most 20 images' }),
   video_paths: z.array(z.string()).max(1, { message: 'A product can have at most 1 video' }).optional(),
   video_duration_seconds: z.number().min(10, { message: 'Video must be between 10 to 15 seconds long.' }).max(15, { message: 'Video must be between 10 to 15 seconds long.' }).nullable().optional(),
 }).superRefine((value, ctx) => {
@@ -55,6 +55,7 @@ export const saveBasicInfoSchema = z.object({
   description: z.string().max(2000).nullable().optional(),
   bulk_discounts: z.array(bulkDiscountSlabSchema).nullable().optional(),
   track_inventory: z.boolean().nullable().optional(),
+  img_paths: z.array(z.string()).min(1, { message: 'The field img_paths must have at least 1 item' }).max(20, { message: 'A product can have at most 20 images' }),
 });
 
 export const variantOptionSchema = z.object({

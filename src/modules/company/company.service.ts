@@ -26,8 +26,15 @@ export class CompanyService {
       const uploadName = await uploadFile(logoFile, {
         folderName: 'company/logo',
         uploadLocation: 'r2',
-        allowedExtensions: { '.jpg': true, '.jpeg': true, '.png': true },
-        allowedMimeTypes: { 'image/jpg': true, 'image/jpeg': true, 'image/png': true },
+        allowedExtensions: { '.jpg': true, '.jpeg': true, '.png': true, '.webp': true, '.heic': true, '.heif': true },
+        allowedMimeTypes: {
+          'image/jpg': true,
+          'image/jpeg': true,
+          'image/png': true,
+          'image/webp': true,
+          'image/heic': true,
+          'image/heif': true,
+        },
       });
 
       logoImgPath = `company/logo/${uploadName}`;
@@ -42,6 +49,7 @@ export class CompanyService {
       email: companyReqData.email?.trim() || undefined,
       currency: companyReqData.currency?.trim().toUpperCase() || 'INR',
       upiId: companyReqData.upi_id?.trim() || undefined,
+      customDomain: companyReqData.custom_domain?.trim().toLowerCase() || null,
       addedBy: loggedInUserId,
       logoImgPath,
     });

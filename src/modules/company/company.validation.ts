@@ -27,6 +27,7 @@ export const saveCompanySchema = z.object({
     .optional()
     .default('INR'),
   upi_id: z.string().max(100, { message: 'The field upi_id must have at most 100 characters' }).optional().default(''),
+  custom_domain: z.string().max(100, { message: 'The field custom_domain must have at most 100 characters' }).nullable().optional(),
 });
 
 export const saveSocialMediaReqSchema = z.object({

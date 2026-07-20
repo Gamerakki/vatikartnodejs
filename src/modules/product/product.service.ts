@@ -355,6 +355,7 @@ export class ProductService {
         minimumOrderQty: req.minimum_order_qty || null,
         updatedBy: loggedInUserId,
         trackInventory: req.track_inventory ?? true,
+        imgPaths: req.img_paths,
       },
       slabs
     );

@@ -370,7 +370,7 @@ export class CatalogueRepository {
     companyId: number,
     bannerText: string | null,
     bannerActive: boolean,
-    bannerImgPath: string | null,
+    bannerImgPath: string | null | undefined,
   ): Promise<void> {
     await prisma.catalogue.updateMany({
       where: {
@@ -381,7 +381,7 @@ export class CatalogueRepository {
       data: {
         bannerText: bannerText ?? undefined,
         bannerActive,
-        ...(bannerImgPath !== null ? { bannerImgPath } : {}),
+        ...(bannerImgPath !== undefined ? { bannerImgPath } : {}),
       },
     });
   }

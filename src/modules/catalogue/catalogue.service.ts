@@ -230,7 +230,7 @@ export class CatalogueService {
     catalogueId: number,
     bannerText: string | null,
     bannerActive: boolean,
-    bannerImgPath: string | null,
+    bannerImgPath: string | null | undefined,
   ): Promise<void> {
     const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
     await catalogueRepository.updateCatalogueBanner(catalogueId, companyId, bannerText, bannerActive, bannerImgPath);

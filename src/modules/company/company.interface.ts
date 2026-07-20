@@ -7,6 +7,7 @@ export interface SaveCompany {
   email?: string;
   currency?: string;
   upi_id?: string;
+  custom_domain?: string | null;
 }
 
 export interface SaveSocialMediaReq {
@@ -30,6 +31,7 @@ export interface CompanyData {
   upi_id: string | null;
   logo_img_path: string | null;
   subdomain?: string | null;
+  custom_domain?: string | null;
   watermark_enabled?: boolean;
   show_download_buttons?: boolean;
   policies?: string | null;
