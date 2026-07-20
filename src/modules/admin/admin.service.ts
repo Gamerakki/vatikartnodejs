@@ -37,6 +37,50 @@ export class AdminService {
       req.action
     );
   }
+
+  getCompanyB2BData(companyId: string) {
+    return adminRepository.getCompanyB2BData(companyId);
+  }
+
+  saveCompanyCustomerGroup(companyId: string, payload: { id?: number; name: string; description?: string | null }) {
+    return adminRepository.saveCompanyCustomerGroup(companyId, payload);
+  }
+
+  deleteCompanyCustomerGroup(companyId: string, groupId: number) {
+    return adminRepository.deleteCompanyCustomerGroup(companyId, groupId);
+  }
+
+  saveCompanyGroupPrices(companyId: string, groupId: number, items: Array<{ product_id: number; custom_price: number }>) {
+    return adminRepository.saveCompanyGroupPrices(companyId, groupId, items);
+  }
+
+  saveCatalogGroupAccess(companyId: string, catalogueId: number, groupIds: number[]) {
+    return adminRepository.saveCatalogGroupAccess(companyId, catalogueId, groupIds);
+  }
+
+  getCompanyCustomDomain(companyId: string) {
+    return adminRepository.getCompanyCustomDomain(companyId);
+  }
+
+  saveCompanyCustomDomain(companyId: string, customDomain: string | null) {
+    return adminRepository.saveCompanyCustomDomain(companyId, customDomain);
+  }
+
+  getCompanyWhatsAppTemplate(companyId: string) {
+    return adminRepository.getCompanyWhatsAppTemplate(companyId);
+  }
+
+  saveCompanyWhatsAppTemplate(companyId: string, productShareText: string) {
+    return adminRepository.saveCompanyWhatsAppTemplate(companyId, productShareText);
+  }
+
+  getAdvancedPlatformAnalytics() {
+    return adminRepository.getAdvancedPlatformAnalytics();
+  }
+
+  getOfflineSyncDiagnostics() {
+    return adminRepository.getOfflineSyncDiagnostics();
+  }
 }
 
 export const adminService = new AdminService();

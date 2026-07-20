@@ -112,6 +112,118 @@ export class AdminController {
       });
     }
   }
+
+  async getCompanyB2BData(req: Request, res: Response): Promise<void> {
+    try {
+      const { companyId } = req.params;
+      const data = await adminService.getCompanyB2BData(companyId);
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async saveCompanyCustomerGroup(req: Request, res: Response): Promise<void> {
+    try {
+      const { companyId } = req.params;
+      const data = await adminService.saveCompanyCustomerGroup(companyId, req.body);
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async deleteCompanyCustomerGroup(req: Request, res: Response): Promise<void> {
+    try {
+      const { companyId, groupId } = req.params;
+      await adminService.deleteCompanyCustomerGroup(companyId, Number(groupId));
+      res.status(200).json({ status: true, msg: 'Group deleted' });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async saveCompanyGroupPrices(req: Request, res: Response): Promise<void> {
+    try {
+      const { companyId, groupId } = req.params;
+      const { product_prices } = req.body as { product_prices?: Array<{ product_id: number; custom_price: number }> };
+      await adminService.saveCompanyGroupPrices(companyId, Number(groupId), product_prices || []);
+      res.status(200).json({ status: true, msg: 'Pricing saved' });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async saveCatalogGroupAccess(req: Request, res: Response): Promise<void> {
+    try {
+      const { companyId, catalogueId } = req.params;
+      const { group_ids } = req.body as { group_ids?: number[] };
+      await adminService.saveCatalogGroupAccess(companyId, Number(catalogueId), group_ids || []);
+      res.status(200).json({ status: true, msg: 'Catalog access updated' });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async getCompanyCustomDomain(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.getCompanyCustomDomain(req.params.companyId);
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async saveCompanyCustomDomain(req: Request, res: Response): Promise<void> {
+    try {
+      const { custom_domain } = req.body as { custom_domain?: string | null };
+      await adminService.saveCompanyCustomDomain(req.params.companyId, custom_domain ?? null);
+      res.status(200).json({ status: true, msg: 'Domain saved' });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async getCompanyWhatsAppTemplate(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.getCompanyWhatsAppTemplate(req.params.companyId);
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async saveCompanyWhatsAppTemplate(req: Request, res: Response): Promise<void> {
+    try {
+      const { product_share_text } = req.body as { product_share_text?: string };
+      if (!product_share_text) {
+        res.status(400).json({ status: false, msg: 'product_share_text is required' });
+        return;
+      }
+      await adminService.saveCompanyWhatsAppTemplate(req.params.companyId, product_share_text);
+      res.status(200).json({ status: true, msg: 'Template saved' });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async getAdvancedAnalytics(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.getAdvancedPlatformAnalytics();
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async getOfflineSyncDiagnostics(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.getOfflineSyncDiagnostics();
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
 }
 
 export const adminController = new AdminController();
