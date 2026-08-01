@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../../config/database';
 import { companyRepository } from '../company/company.repository';
+import { analyticsService } from './analytics.service';
 
 type DashboardRange = 'today' | 'week' | 'month' | 'all';
 
@@ -146,6 +147,21 @@ export class AnalyticsController {
       });
     } catch (err) {
       res.status(500).json({ status: false, msg: 'An error occurred', error: (err as Error).message });
+    }
+  }
+
+  async getActiveShoppers(req: Request, res: Response): Promise<void> {
+    const loggedInUserId = res.locals.userId || 0;
+    try {
+      const shoppers = await analyticsService.getActiveShoppers(loggedInUserId);
+      res.status(200).json({ status: true, data: shoppers });
+    } catch (err) {
+      const statusCode = (err as { statusCode?: number }).statusCode || 500;
+      res.status(statusCode).json({
+        status: false,
+        msg: statusCode === 404 ? 'Company not found' : 'An error occurred',
+        error: (err as Error).message,
+      });
     }
   }
 }

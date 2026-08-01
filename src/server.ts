@@ -21,6 +21,9 @@ type StorefrontActivityPayload = {
   activityType: 'view_catalog' | 'view_product';
   label: string;
   timestamp: string;
+  customerName?: string;
+  customerPhone?: string;
+  guestId?: string;
 };
 
 const portRaw = process.env.PORT || '8080';
@@ -50,6 +53,28 @@ async function bootstrap() {
     socket.on('storefront_activity', (payload: StorefrontActivityPayload) => {
       if (!payload?.companyId) return;
       io.to(`company:${payload.companyId}`).emit('storefront_activity', payload);
+
+      // Persist timeline so merchants can review shopper activity later
+      void (async () => {
+        try {
+          const eventValue = [
+            payload.customerName || 'Guest',
+            payload.customerPhone || payload.guestId || 'Anonymous',
+            payload.activityType,
+            payload.label || '',
+          ].join('|').slice(0, 250);
+
+          await prisma.analyticsEvent.create({
+            data: {
+              companyId: BigInt(payload.companyId),
+              eventType: 'STOREFRONT_ACTIVITY',
+              eventValue,
+            },
+          });
+        } catch (err) {
+          logger.warn({ err }, 'Failed to persist storefront_activity analytics event');
+        }
+      })();
 
       // Fire-and-forget push notification to the merchant
       void (async () => {

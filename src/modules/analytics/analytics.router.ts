@@ -10,5 +10,6 @@ router.post('/log', analyticsController.logEvent);
 // Dashboard analytics require authentication
 router.use(validateAuth);
 router.get('/dashboard', analyticsController.getDashboard);
+router.get('/active-shoppers', analyticsController.getActiveShoppers);
 
 export const analyticsRouter = router;
