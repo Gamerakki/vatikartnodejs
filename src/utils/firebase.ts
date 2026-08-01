@@ -68,3 +68,89 @@ export async function sendFcmNotification(
     return false;
   }
 }
+
+export type FcmMulticastResult = {
+  successCount: number;
+  failureCount: number;
+  totalTokens: number;
+  invalidTokens: string[];
+  mock: boolean;
+};
+
+/**
+ * Send an FCM multicast (batched in chunks of 500) and collect unregistered tokens for cleanup.
+ */
+export async function sendFcmMulticast(params: {
+  tokens: string[];
+  title: string;
+  body: string;
+  data?: Record<string, string>;
+}): Promise<FcmMulticastResult> {
+  const tokens = [...new Set((params.tokens || []).filter(Boolean))];
+  const data: Record<string, string> = {};
+  for (const [key, value] of Object.entries(params.data || {})) {
+    data[key] = String(value);
+  }
+
+  if (tokens.length === 0) {
+    return { successCount: 0, failureCount: 0, totalTokens: 0, invalidTokens: [], mock: !isFirebaseInitialized };
+  }
+
+  if (!isFirebaseInitialized) {
+    logger.info(
+      `[firebase] [MOCK MULTICAST] tokens=${tokens.length} | Title: ${params.title} | Body: ${params.body} | Data: ${JSON.stringify(data)}`,
+    );
+    return {
+      successCount: tokens.length,
+      failureCount: 0,
+      totalTokens: tokens.length,
+      invalidTokens: [],
+      mock: true,
+    };
+  }
+
+  const messaging = getMessaging();
+  let successCount = 0;
+  let failureCount = 0;
+  const invalidTokens: string[] = [];
+  const INVALID_CODES = new Set([
+    'messaging/invalid-registration-token',
+    'messaging/registration-token-not-registered',
+  ]);
+
+  const CHUNK = 500;
+  for (let i = 0; i < tokens.length; i += CHUNK) {
+    const chunk = tokens.slice(i, i + CHUNK);
+    const response = await messaging.sendEachForMulticast({
+      tokens: chunk,
+      notification: {
+        title: params.title,
+        body: params.body,
+      },
+      data,
+    });
+
+    successCount += response.successCount;
+    failureCount += response.failureCount;
+
+    response.responses.forEach((res, idx) => {
+      if (res.success) return;
+      const code = (res.error as { code?: string } | undefined)?.code;
+      if (code && INVALID_CODES.has(code)) {
+        invalidTokens.push(chunk[idx]);
+      }
+    });
+  }
+
+  logger.info(
+    `[firebase] Multicast done: success=${successCount} failure=${failureCount} invalid=${invalidTokens.length}`,
+  );
+
+  return {
+    successCount,
+    failureCount,
+    totalTokens: tokens.length,
+    invalidTokens,
+    mock: false,
+  };
+}

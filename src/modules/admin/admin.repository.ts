@@ -2250,6 +2250,121 @@ export class AdminRepository {
     };
   }
 
+  async sendFcmPushBroadcast(payload: {
+    title: string;
+    body?: string;
+    message?: string;
+    target_screen?: string;
+    target_plan?: string;
+    test_company_id?: string;
+  }) {
+    const { sendFcmMulticast } = await import('../../utils/firebase');
+    const title = String(payload.title || '').trim();
+    const body = String(payload.body || payload.message || '').trim();
+    if (!title || !body) throw new Error('title and body are required');
+
+    const targetScreen = payload.target_screen || 'Home';
+    const rawPlan = String(payload.target_plan || 'ALL_MERCHANTS').toUpperCase();
+    const planMap: Record<string, string> = {
+      ALL_MERCHANTS: 'ALL',
+      ALL: 'ALL',
+      FREE_TIER: 'FREE',
+      FREE: 'FREE',
+      SILVER_TIER: 'SILVER',
+      SILVER: 'SILVER',
+      GOLD_TIER: 'GOLD',
+      GOLD: 'GOLD',
+      ACTIVE: 'ACTIVE',
+    };
+    const targetPlan = planMap[rawPlan] || 'ALL';
+
+    const users = await prisma.user.findMany({
+      where: {
+        isDeleted: false,
+        pushToken: { not: null },
+        ...(payload.test_company_id
+          ? {
+              OR: [
+                { companyId: BigInt(payload.test_company_id) },
+                { addedCompanies: { some: { companyId: BigInt(payload.test_company_id) } } },
+              ],
+            }
+          : {}),
+      },
+      select: {
+        userId: true,
+        pushToken: true,
+        companyId: true,
+        company: { select: { companyId: true, subscription: { select: { planName: true, status: true } } } },
+        addedCompanies: {
+          select: { companyId: true, subscription: { select: { planName: true, status: true } } },
+          take: 1,
+        },
+      },
+    });
+
+    const eligible = users.filter((u) => {
+      if (!u.pushToken) return false;
+      if (payload.test_company_id) return true;
+      const sub =
+        u.company?.subscription
+        || u.addedCompanies?.[0]?.subscription
+        || null;
+      const planName = (sub?.planName || 'FREE').toUpperCase();
+      const status = (sub?.status || '').toUpperCase();
+      if (targetPlan === 'ALL') return true;
+      if (targetPlan === 'ACTIVE') return status === 'ACTIVE';
+      return planName === targetPlan;
+    });
+
+    const tokenUserMap = new Map<string, bigint>();
+    for (const u of eligible) {
+      if (u.pushToken && !tokenUserMap.has(u.pushToken)) {
+        tokenUserMap.set(u.pushToken, u.userId);
+      }
+    }
+    const fcmTokensArray = [...tokenUserMap.keys()];
+
+    const result = await sendFcmMulticast({
+      tokens: fcmTokensArray,
+      title,
+      body,
+      data: {
+        targetScreen,
+        click_action: 'FLUTTER_NOTIFICATION_CLICK',
+        timestamp: new Date().toISOString(),
+        type: 'ADMIN_BROADCAST',
+      },
+    });
+
+    if (result.invalidTokens.length > 0) {
+      await prisma.user.updateMany({
+        where: { pushToken: { in: result.invalidTokens } },
+        data: { pushToken: null },
+      });
+    }
+
+    await this.writeAuditLog({
+      actionType: 'FCM_PUSH_BROADCAST',
+      details: `FCM "${title}" → screen=${targetScreen}, plan=${rawPlan}, success=${result.successCount}, failure=${result.failureCount}, cleaned=${result.invalidTokens.length}`,
+    });
+
+    return {
+      successCount: result.successCount,
+      failureCount: result.failureCount,
+      totalTokens: result.totalTokens,
+      cleaned_tokens: result.invalidTokens.length,
+      target_screen: targetScreen,
+      target_plan: rawPlan,
+      mock: result.mock,
+      test_mode: Boolean(payload.test_company_id),
+      // backward-compatible aliases used by older UI
+      sent: result.successCount,
+      matched: result.totalTokens,
+    };
+  }
+
+  /** @deprecated use sendFcmPushBroadcast */
   async sendExpoPushBroadcast(payload: {
     title: string;
     message: string;
@@ -2257,55 +2372,13 @@ export class AdminRepository {
     target_plan?: string;
     test_company_id?: string;
   }) {
-    const { sendMerchantNotification } = await import('../../utils/notification');
-    const title = String(payload.title || '').trim();
-    const message = String(payload.message || '').trim();
-    if (!title || !message) throw new Error('title and message are required');
-
-    const targetScreen = payload.target_screen || 'Orders';
-    const targetPlan = (payload.target_plan || 'ALL').toUpperCase();
-
-    const companies = await prisma.company.findMany({
-      where: {
-        isDeleted: false,
-        ...(payload.test_company_id ? { companyId: BigInt(payload.test_company_id) } : {}),
-      },
-      include: {
-        addedByUser: { select: { userId: true, pushToken: true } },
-        subscription: { select: { planName: true, status: true } },
-      },
+    return this.sendFcmPushBroadcast({
+      title: payload.title,
+      body: payload.message,
+      target_screen: payload.target_screen,
+      target_plan: payload.target_plan,
+      test_company_id: payload.test_company_id,
     });
-
-    let targets = companies.filter((c) => c.addedByUser?.pushToken);
-    if (!payload.test_company_id && targetPlan !== 'ALL' && targetPlan !== 'ACTIVE') {
-      targets = targets.filter((c) => (c.subscription?.planName || 'FREE').toUpperCase() === targetPlan);
-    }
-    if (!payload.test_company_id && targetPlan === 'ACTIVE') {
-      targets = targets.filter((c) => (c.subscription?.status || '').toUpperCase() === 'ACTIVE');
-    }
-
-    let sent = 0;
-    for (const c of targets) {
-      if (!c.addedByUser) continue;
-      await sendMerchantNotification(c.addedByUser.userId, title, message, {
-        targetScreen,
-        type: 'ADMIN_BROADCAST',
-      });
-      sent += 1;
-    }
-
-    await this.writeAuditLog({
-      actionType: 'PUSH_BROADCAST',
-      details: `Push broadcast "${title}" → screen=${targetScreen}, plan=${targetPlan}, sent=${sent}`,
-    });
-
-    return {
-      sent,
-      matched: targets.length,
-      target_screen: targetScreen,
-      target_plan: targetPlan,
-      test_mode: Boolean(payload.test_company_id),
-    };
   }
 
   async getRfmSegmentation() {

@@ -222,6 +222,18 @@ export class AdminService {
     return adminRepository.releasePayoutSettlement(ledgerId);
   }
 
+  sendFcmPushBroadcast(payload: {
+    title: string;
+    body?: string;
+    message?: string;
+    target_screen?: string;
+    target_plan?: string;
+    test_company_id?: string;
+  }) {
+    return adminRepository.sendFcmPushBroadcast(payload);
+  }
+
+  /** @deprecated use sendFcmPushBroadcast */
   sendExpoPushBroadcast(payload: {
     title: string;
     message: string;
@@ -229,7 +241,13 @@ export class AdminService {
     target_plan?: string;
     test_company_id?: string;
   }) {
-    return adminRepository.sendExpoPushBroadcast(payload);
+    return adminRepository.sendFcmPushBroadcast({
+      title: payload.title,
+      body: payload.message,
+      target_screen: payload.target_screen,
+      target_plan: payload.target_plan,
+      test_company_id: payload.test_company_id,
+    });
   }
 
   getRfmSegmentation() {

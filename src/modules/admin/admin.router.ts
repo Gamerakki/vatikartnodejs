@@ -62,7 +62,7 @@ router.get('/syndications', validateAuth, adminController.getCatalogSyndications
 router.put('/syndications/:id/margin', validateAuth, adminController.updateSyndicationMargin);
 router.get('/financial/ledger', validateAuth, adminController.getFinancialLedgerMetrics);
 router.post('/financial/ledger/:id/release', validateAuth, adminController.releasePayoutSettlement);
-router.post('/push-broadcast', validateAuth, adminController.sendExpoPushBroadcast);
+router.post('/push-broadcast', validateAuth, adminController.sendFcmPushBroadcast);
 router.get('/rfm-segments', validateAuth, adminController.getRfmSegmentation);
 router.get('/privacy/deletion-requests', validateAuth, adminController.listDeletionRequests);
 router.post('/privacy/deletion-requests', validateAuth, adminController.createDeletionRequest);

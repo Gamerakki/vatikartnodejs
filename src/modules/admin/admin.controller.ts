@@ -538,13 +538,26 @@ export class AdminController {
     }
   }
 
-  async sendExpoPushBroadcast(req: Request, res: Response): Promise<void> {
+  async sendFcmPushBroadcast(req: Request, res: Response): Promise<void> {
     try {
-      const data = await adminService.sendExpoPushBroadcast(req.body || {});
+      const body = req.body || {};
+      const data = await adminService.sendFcmPushBroadcast({
+        title: body.title,
+        body: body.body || body.message,
+        message: body.message,
+        target_screen: body.target_screen || body.targetScreen,
+        target_plan: body.target_plan || body.targetPlan,
+        test_company_id: body.test_company_id || body.testCompanyId,
+      });
       res.status(200).json({ status: true, data });
     } catch (err) {
       res.status(400).json({ status: false, msg: (err as Error).message });
     }
+  }
+
+  /** @deprecated alias — same as sendFcmPushBroadcast */
+  async sendExpoPushBroadcast(req: Request, res: Response): Promise<void> {
+    return this.sendFcmPushBroadcast(req, res);
   }
 
   async getRfmSegmentation(req: Request, res: Response): Promise<void> {
