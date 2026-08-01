@@ -480,6 +480,118 @@ export class AdminController {
       res.status(500).json({ status: false, msg: (err as Error).message });
     }
   }
+
+  async getAiBotConfigs(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.getAiBotConfigs();
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async overrideAiBotConfig(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.overrideAiBotConfig(req.body || {});
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(400).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async getCatalogSyndications(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.getCatalogSyndications();
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async updateSyndicationMargin(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.updateSyndicationMargin(
+        String(req.params.id),
+        Number(req.body?.margin_markup_pct ?? 0),
+      );
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(400).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async getFinancialLedgerMetrics(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.getFinancialLedgerMetrics();
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async releasePayoutSettlement(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.releasePayoutSettlement(String(req.params.id));
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(400).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async sendExpoPushBroadcast(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.sendExpoPushBroadcast(req.body || {});
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(400).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async getRfmSegmentation(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.getRfmSegmentation();
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async listDeletionRequests(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.listDeletionRequests();
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async createDeletionRequest(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.createDeletionRequest(req.body || {});
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(400).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async processDeletionRequest(req: Request, res: Response): Promise<void> {
+    try {
+      const action = String(req.body?.action || 'COMPLETE').toUpperCase() === 'REJECT' ? 'REJECT' : 'COMPLETE';
+      const data = await adminService.processDeletionRequest(String(req.params.id), action);
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(400).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async triggerDatabaseBackup(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.triggerDatabaseBackup();
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
 }
 
 export const adminController = new AdminController();

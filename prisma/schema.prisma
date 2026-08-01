@@ -517,3 +517,54 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+model AiBotConfig {
+  configId     BigInt   @id @default(autoincrement()) @map("config_id")
+  companyId    BigInt   @unique @map("company_id")
+  botName      String   @default("VatiKart Sales Assistant") @map("bot_name") @db.VarChar(100)
+  systemPrompt String   @map("system_prompt") @db.Text
+  isEnabled    Boolean  @default(true) @map("is_enabled")
+  autoReply    Boolean  @default(true) @map("auto_reply")
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("ai_bot_configs")
+}
+
+model CatalogSyndication {
+  syndicationId   BigInt   @id @default(autoincrement()) @map("syndication_id")
+  sourceCatalogId BigInt   @map("source_catalog_id")
+  targetCompanyId BigInt   @map("target_company_id")
+  marginMarkupPct Decimal  @default(0) @map("margin_markup_pct") @db.Decimal(5, 2)
+  status          String   @default("ACTIVE") @db.VarChar(20)
+  createdDate     DateTime @default(now()) @map("created_date") @db.Timestamptz
+
+  @@map("catalog_syndications")
+}
+
+model FinancialLedger {
+  ledgerId      BigInt    @id @default(autoincrement()) @map("ledger_id")
+  companyId     BigInt    @map("company_id")
+  transactionId String    @map("transaction_id") @db.VarChar(100)
+  grossAmount   Decimal   @map("gross_amount") @db.Decimal(10, 2)
+  platformFee   Decimal   @map("platform_fee") @db.Decimal(10, 2)
+  gatewayFee    Decimal   @map("gateway_fee") @db.Decimal(10, 2)
+  netPayout     Decimal   @map("net_payout") @db.Decimal(10, 2)
+  payoutStatus  String    @default("PENDING") @map("payout_status") @db.VarChar(20) // PENDING, PAID, DISPUTED
+  settledDate   DateTime? @map("settled_date") @db.Timestamptz
+  createdDate   DateTime  @default(now()) @map("created_date") @db.Timestamptz
+
+  @@index([companyId])
+  @@map("financial_ledgers")
+}
+
+model DataDeletionRequest {
+  requestId   BigInt    @id @default(autoincrement()) @map("request_id")
+  phone       String    @db.VarChar(20)
+  reason      String?   @db.Text
+  status      String    @default("PENDING") @db.VarChar(20) // PENDING, COMPLETED, REJECTED
+  processedAt DateTime? @map("processed_at") @db.Timestamptz
+  addedDate   DateTime  @default(now()) @map("added_date") @db.Timestamptz
+
+  @@index([phone])
+  @@map("data_deletion_requests")
+}
+

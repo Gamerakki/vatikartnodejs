@@ -55,4 +55,18 @@ router.get('/audit-logs', validateAuth, adminController.getAuditLogs);
 router.get('/billing/invoices', validateAuth, adminController.getBillingInvoices);
 router.get('/campaigns/targets', validateAuth, adminController.getCampaignTargets);
 
+// Magical Admin Command Center 3.0
+router.get('/ai-bots', validateAuth, adminController.getAiBotConfigs);
+router.post('/ai-bots/override', validateAuth, adminController.overrideAiBotConfig);
+router.get('/syndications', validateAuth, adminController.getCatalogSyndications);
+router.put('/syndications/:id/margin', validateAuth, adminController.updateSyndicationMargin);
+router.get('/financial/ledger', validateAuth, adminController.getFinancialLedgerMetrics);
+router.post('/financial/ledger/:id/release', validateAuth, adminController.releasePayoutSettlement);
+router.post('/push-broadcast', validateAuth, adminController.sendExpoPushBroadcast);
+router.get('/rfm-segments', validateAuth, adminController.getRfmSegmentation);
+router.get('/privacy/deletion-requests', validateAuth, adminController.listDeletionRequests);
+router.post('/privacy/deletion-requests', validateAuth, adminController.createDeletionRequest);
+router.post('/privacy/deletion-requests/:id/process', validateAuth, adminController.processDeletionRequest);
+router.post('/privacy/backup', validateAuth, adminController.triggerDatabaseBackup);
+
 export const adminRouter = router;

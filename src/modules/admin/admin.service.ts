@@ -191,6 +191,66 @@ export class AdminService {
   getCampaignTargets(audience: string) {
     return adminRepository.getCampaignTargets(audience);
   }
+
+  getAiBotConfigs() {
+    return adminRepository.getAiBotConfigs();
+  }
+
+  overrideAiBotConfig(payload: {
+    company_id: string;
+    bot_name?: string;
+    system_prompt?: string;
+    is_enabled?: boolean;
+    auto_reply?: boolean;
+  }) {
+    return adminRepository.overrideAiBotConfig(payload);
+  }
+
+  getCatalogSyndications() {
+    return adminRepository.getCatalogSyndications();
+  }
+
+  updateSyndicationMargin(syndicationId: string, marginMarkupPct: number) {
+    return adminRepository.updateSyndicationMargin(syndicationId, marginMarkupPct);
+  }
+
+  getFinancialLedgerMetrics() {
+    return adminRepository.getFinancialLedgerMetrics();
+  }
+
+  releasePayoutSettlement(ledgerId: string) {
+    return adminRepository.releasePayoutSettlement(ledgerId);
+  }
+
+  sendExpoPushBroadcast(payload: {
+    title: string;
+    message: string;
+    target_screen?: string;
+    target_plan?: string;
+    test_company_id?: string;
+  }) {
+    return adminRepository.sendExpoPushBroadcast(payload);
+  }
+
+  getRfmSegmentation() {
+    return adminRepository.getRfmSegmentation();
+  }
+
+  listDeletionRequests() {
+    return adminRepository.listDeletionRequests();
+  }
+
+  createDeletionRequest(payload: { phone: string; reason?: string }) {
+    return adminRepository.createDeletionRequest(payload);
+  }
+
+  processDeletionRequest(requestId: string, action: 'COMPLETE' | 'REJECT' = 'COMPLETE') {
+    return adminRepository.processDeletionRequest(requestId, action);
+  }
+
+  triggerDatabaseBackup() {
+    return adminRepository.triggerDatabaseBackup();
+  }
 }
 
 export const adminService = new AdminService();
