@@ -982,6 +982,13 @@ export class AdminRepository {
       },
     });
 
+    await this.writeAuditLog({
+      companyId,
+      actionType: 'PLAN_CHANGE',
+      details: `Override plan=${sub.planName}, status=${sub.status}, bonus=${sub.additionalProducts}`,
+      performedBy: 'super_admin',
+    });
+
     return {
       company_id: companyId,
       plan_name: sub.planName,
@@ -1271,11 +1278,19 @@ export class AdminRepository {
       select: { quantity: true },
     });
 
+    const stock = stockRows.reduce((s, r) => s + r.quantity, 0);
+    await this.writeAuditLog({
+      companyId: product.companyId.toString(),
+      actionType: 'PRODUCT_EDIT',
+      details: `Product ${productId} updated price=${updated.price}, stock=${stock}, deleted=${updated.isDeleted}`,
+      performedBy: 'super_admin',
+    });
+
     return {
       product_id: updated.productId.toString(),
       price: Number(updated.price || 0),
       is_deleted: updated.isDeleted,
-      stock: stockRows.reduce((s, r) => s + r.quantity, 0),
+      stock,
     };
   }
 
@@ -1353,6 +1368,13 @@ export class AdminRepository {
       `Status: ${order.status}\n` +
       `${itemLines}\n` +
       `Total: ₹${Number(order.total).toFixed(2)}`;
+
+    await this.writeAuditLog({
+      companyId: order.companyId?.toString?.() || null,
+      actionType: 'ORDER_OVERRIDE',
+      details: `Order #${order.orderId} status set to ${order.status}`,
+      performedBy: 'super_admin',
+    });
 
     return {
       order_id: order.orderId.toString(),
@@ -1536,6 +1558,322 @@ export class AdminRepository {
       rate_limit_per_minute: row.rateLimitPerMinute,
       is_revoked: row.isRevoked,
     };
+  }
+
+  async writeAuditLog(payload: {
+    companyId?: string | null;
+    performedBy?: string;
+    actionType: string;
+    details: string;
+    ipAddress?: string | null;
+  }) {
+    const row = await prisma.auditLog.create({
+      data: {
+        companyId: payload.companyId ? BigInt(payload.companyId) : null,
+        performedBy: payload.performedBy || 'super_admin',
+        actionType: payload.actionType,
+        details: payload.details,
+        ipAddress: payload.ipAddress || null,
+      },
+    });
+    return {
+      log_id: row.logId.toString(),
+      action_type: row.actionType,
+      added_date: row.addedDate.toISOString(),
+    };
+  }
+
+  async getChurnRiskPredictor() {
+    const now = Date.now();
+    const day = 24 * 60 * 60 * 1000;
+    const companies = await prisma.company.findMany({
+      where: { isDeleted: false },
+      include: {
+        addedByUser: { select: { firstName: true, lastName: true, mobileNo: true, emailId: true, lastActiveTime: true } },
+        subscription: { select: { planName: true, status: true } },
+        _count: {
+          select: {
+            products: { where: { isDeleted: false } },
+            orders: true,
+          },
+        },
+      },
+      orderBy: { companyId: 'desc' },
+    });
+
+    const merchants = await Promise.all(
+      companies.map(async (c) => {
+        const lastOrder = await prisma.order.findFirst({
+          where: { companyId: c.companyId },
+          orderBy: { addedDate: 'desc' },
+          select: { addedDate: true },
+        });
+        const lastActive =
+          c.addedByUser?.lastActiveTime ||
+          lastOrder?.addedDate ||
+          c.updatedDate ||
+          c.addedDate;
+        const inactiveDays = Math.floor((now - lastActive.getTime()) / day);
+        const productCount = c._count.products;
+        const orderCount = c._count.orders;
+        const recentOrders = await prisma.order.count({
+          where: {
+            companyId: c.companyId,
+            addedDate: { gte: new Date(now - 30 * day) },
+          },
+        });
+        const recent7Orders = await prisma.order.count({
+          where: {
+            companyId: c.companyId,
+            addedDate: { gte: new Date(now - 7 * day) },
+          },
+        });
+
+        let risk: 'HIGH' | 'MEDIUM' | 'HEALTHY' = 'MEDIUM';
+        let reason = 'Limited activity';
+        if (inactiveDays > 14 || productCount === 0) {
+          risk = 'HIGH';
+          reason = productCount === 0 ? 'No products created' : `Inactive for ${inactiveDays} days`;
+        } else if (productCount <= 5 && recentOrders === 0) {
+          risk = 'MEDIUM';
+          reason = '1–5 products, no orders in 30 days';
+        } else if (inactiveDays <= 7 && recent7Orders > 5) {
+          risk = 'HEALTHY';
+          reason = 'Active in last 7 days with strong order volume';
+        } else if (inactiveDays <= 7 && orderCount > 5) {
+          risk = 'HEALTHY';
+          reason = 'Recently active with solid order history';
+        }
+
+        return {
+          company_id: c.companyId.toString(),
+          company_name: c.companyName,
+          owner_name: c.addedByUser
+            ? `${c.addedByUser.firstName} ${c.addedByUser.lastName || ''}`.trim()
+            : 'Unknown',
+          owner_phone: c.addedByUser?.mobileNo || c.phone || null,
+          owner_email: c.addedByUser?.emailId || c.email || null,
+          plan_name: c.subscription?.planName || 'FREE',
+          product_count: productCount,
+          order_count: orderCount,
+          last_active: lastActive.toISOString(),
+          inactive_days: inactiveDays,
+          risk,
+          reason,
+        };
+      }),
+    );
+
+    const rank = { HIGH: 0, MEDIUM: 1, HEALTHY: 2 };
+    merchants.sort((a, b) => rank[a.risk] - rank[b.risk] || b.inactive_days - a.inactive_days);
+
+    return {
+      summary: {
+        high: merchants.filter((m) => m.risk === 'HIGH').length,
+        medium: merchants.filter((m) => m.risk === 'MEDIUM').length,
+        healthy: merchants.filter((m) => m.risk === 'HEALTHY').length,
+        total: merchants.length,
+      },
+      merchants,
+    };
+  }
+
+  async listPlatformCoupons() {
+    const rows = await prisma.platformCoupon.findMany({ orderBy: { addedDate: 'desc' } });
+    return rows.map((r) => ({
+      coupon_id: r.couponId.toString(),
+      code: r.code,
+      discount_type: r.discountType,
+      discount_value: Number(r.discountValue),
+      max_redemptions: r.maxRedemptions,
+      used_count: r.usedCount,
+      expiry_date: r.expiryDate ? r.expiryDate.toISOString() : null,
+      is_active: r.isActive,
+      added_date: r.addedDate.toISOString(),
+    }));
+  }
+
+  async createPlatformCoupon(payload: {
+    code: string;
+    discount_type: string;
+    discount_value: number;
+    max_redemptions?: number;
+    expiry_date?: string | null;
+  }) {
+    const code = String(payload.code || '').trim().toUpperCase();
+    if (!code) throw new Error('code is required');
+    const discountType = String(payload.discount_type || '').toUpperCase();
+    if (!['PERCENTAGE', 'FLAT'].includes(discountType)) {
+      throw new Error('discount_type must be PERCENTAGE or FLAT');
+    }
+    const row = await prisma.platformCoupon.create({
+      data: {
+        code,
+        discountType,
+        discountValue: Number(payload.discount_value || 0),
+        maxRedemptions: Number(payload.max_redemptions || 100),
+        expiryDate: payload.expiry_date ? new Date(payload.expiry_date) : null,
+        isActive: true,
+      },
+    });
+    await this.writeAuditLog({
+      actionType: 'SECURITY',
+      details: `Created platform coupon ${code} (${discountType} ${payload.discount_value})`,
+      performedBy: 'super_admin',
+    });
+    return {
+      coupon_id: row.couponId.toString(),
+      code: row.code,
+      discount_type: row.discountType,
+      discount_value: Number(row.discountValue),
+      max_redemptions: row.maxRedemptions,
+      used_count: row.usedCount,
+      expiry_date: row.expiryDate ? row.expiryDate.toISOString() : null,
+      is_active: row.isActive,
+    };
+  }
+
+  async deactivatePlatformCoupon(couponId: string) {
+    const row = await prisma.platformCoupon.update({
+      where: { couponId: BigInt(couponId) },
+      data: { isActive: false },
+    });
+    await this.writeAuditLog({
+      actionType: 'SECURITY',
+      details: `Deactivated platform coupon ${row.code}`,
+      performedBy: 'super_admin',
+    });
+    return { coupon_id: row.couponId.toString(), code: row.code, is_active: row.isActive };
+  }
+
+  async getAuditLogs(query = '', limit = 100) {
+    const take = Math.min(Math.max(Number(limit) || 100, 1), 300);
+    const q = (query || '').trim();
+    const where: any = {};
+    if (q) {
+      where.OR = [
+        { actionType: { contains: q, mode: 'insensitive' } },
+        { details: { contains: q, mode: 'insensitive' } },
+        { performedBy: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+    const rows = await prisma.auditLog.findMany({
+      where,
+      orderBy: { addedDate: 'desc' },
+      take,
+    });
+    const companyIds = [...new Set(rows.map((r) => r.companyId).filter(Boolean))] as bigint[];
+    const companies = companyIds.length
+      ? await prisma.company.findMany({
+          where: { companyId: { in: companyIds } },
+          select: { companyId: true, companyName: true },
+        })
+      : [];
+    const nameById = new Map(companies.map((c) => [c.companyId.toString(), c.companyName]));
+
+    return rows.map((r) => ({
+      log_id: r.logId.toString(),
+      company_id: r.companyId ? r.companyId.toString() : null,
+      company_name: r.companyId ? nameById.get(r.companyId.toString()) || 'Unknown' : 'Platform',
+      performed_by: r.performedBy,
+      action_type: r.actionType,
+      details: r.details,
+      ip_address: r.ipAddress,
+      added_date: r.addedDate.toISOString(),
+    }));
+  }
+
+  async getBillingInvoices() {
+    const subs = await prisma.subscription.findMany({
+      where: { pricePaid: { gt: 0 } },
+      include: {
+        company: {
+          select: {
+            companyId: true,
+            companyName: true,
+            address: true,
+            email: true,
+            phone: true,
+            pincode: true,
+          },
+        },
+      },
+      orderBy: { updatedDate: 'desc' },
+    });
+
+    return subs.map((s, idx) => {
+      const gross = Number(s.pricePaid || 0);
+      const taxable = Number((gross / 1.18).toFixed(2));
+      const gst = Number((gross - taxable).toFixed(2));
+      const cgst = Number((gst / 2).toFixed(2));
+      const sgst = Number((gst / 2).toFixed(2));
+      const invoiceNo = `VK-INV-${s.subscriptionId.toString().padStart(6, '0')}`;
+      return {
+        invoice_id: s.subscriptionId.toString(),
+        invoice_no: invoiceNo,
+        company_id: s.company.companyId.toString(),
+        company_name: s.company.companyName,
+        company_address: s.company.address || '—',
+        company_phone: s.company.phone || '—',
+        company_email: s.company.email || '—',
+        company_gstin: 'UNREGISTERED',
+        plan_name: s.planName,
+        status: s.status,
+        sac_code: '998313',
+        sac_description: 'IT design and development services',
+        taxable_value: taxable,
+        cgst_rate: 9,
+        sgst_rate: 9,
+        igst_rate: 18,
+        cgst_amount: cgst,
+        sgst_amount: sgst,
+        igst_amount: gst,
+        total_amount: gross,
+        invoice_date: (s.updatedDate || s.startDate).toISOString(),
+        period_start: s.startDate.toISOString(),
+        period_end: s.endDate ? s.endDate.toISOString() : null,
+        serial: idx + 1,
+      };
+    });
+  }
+
+  async getCampaignTargets(audience: string) {
+    const filter = String(audience || 'ALL').toUpperCase();
+    if (filter === 'HIGH_CHURN') {
+      const churn = await this.getChurnRiskPredictor();
+      return churn.merchants
+        .filter((m) => m.risk === 'HIGH')
+        .map((m) => ({
+          company_id: m.company_id,
+          company_name: m.company_name,
+          owner_name: m.owner_name,
+          owner_phone: m.owner_phone,
+          plan_name: m.plan_name,
+        }));
+    }
+
+    const companies = await prisma.company.findMany({
+      where: { isDeleted: false },
+      include: {
+        addedByUser: { select: { firstName: true, lastName: true, mobileNo: true } },
+        subscription: { select: { planName: true } },
+      },
+    });
+
+    let list = companies.map((c) => ({
+      company_id: c.companyId.toString(),
+      company_name: c.companyName,
+      owner_name: c.addedByUser
+        ? `${c.addedByUser.firstName} ${c.addedByUser.lastName || ''}`.trim()
+        : 'Merchant',
+      owner_phone: c.addedByUser?.mobileNo || c.phone || null,
+      plan_name: c.subscription?.planName || 'FREE',
+    }));
+
+    if (filter === 'FREE') {
+      list = list.filter((m) => (m.plan_name || 'FREE').toUpperCase() === 'FREE');
+    }
+    return list;
   }
 }
 

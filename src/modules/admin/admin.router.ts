@@ -46,4 +46,13 @@ router.post('/micro/customers/blacklist', validateAuth, adminController.toggleCu
 router.get('/micro/api-access', validateAuth, adminController.listApiAccessConfigs);
 router.put('/micro/api-access/:companyId', validateAuth, adminController.updateApiAccessConfig);
 
+// Growth Suite 2.0
+router.get('/churn-risk', validateAuth, adminController.getChurnRiskPredictor);
+router.get('/coupons', validateAuth, adminController.listPlatformCoupons);
+router.post('/coupons', validateAuth, adminController.createPlatformCoupon);
+router.delete('/coupons/:id', validateAuth, adminController.deactivatePlatformCoupon);
+router.get('/audit-logs', validateAuth, adminController.getAuditLogs);
+router.get('/billing/invoices', validateAuth, adminController.getBillingInvoices);
+router.get('/campaigns/targets', validateAuth, adminController.getCampaignTargets);
+
 export const adminRouter = router;

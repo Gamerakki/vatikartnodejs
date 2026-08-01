@@ -414,6 +414,72 @@ export class AdminController {
       res.status(msg === 'Company not found' ? 404 : 500).json({ status: false, msg });
     }
   }
+
+  async getChurnRiskPredictor(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.getChurnRiskPredictor();
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async listPlatformCoupons(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.listPlatformCoupons();
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async createPlatformCoupon(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.createPlatformCoupon(req.body || {});
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(400).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async deactivatePlatformCoupon(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.deactivatePlatformCoupon(req.params.id);
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async getAuditLogs(req: Request, res: Response): Promise<void> {
+    try {
+      const query = String(req.query.q || req.query.query || '');
+      const limit = req.query.limit ? Number(req.query.limit) : 100;
+      const data = await adminService.getAuditLogs(query, limit);
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async getBillingInvoices(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.getBillingInvoices();
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async getCampaignTargets(req: Request, res: Response): Promise<void> {
+    try {
+      const audience = String(req.query.audience || 'ALL');
+      const data = await adminService.getCampaignTargets(audience);
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
 }
 
 export const adminController = new AdminController();

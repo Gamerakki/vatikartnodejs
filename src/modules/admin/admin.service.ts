@@ -157,6 +157,40 @@ export class AdminService {
   ) {
     return adminRepository.updateApiAccessConfig(companyId, payload);
   }
+
+  getChurnRiskPredictor() {
+    return adminRepository.getChurnRiskPredictor();
+  }
+
+  listPlatformCoupons() {
+    return adminRepository.listPlatformCoupons();
+  }
+
+  createPlatformCoupon(payload: {
+    code: string;
+    discount_type: string;
+    discount_value: number;
+    max_redemptions?: number;
+    expiry_date?: string | null;
+  }) {
+    return adminRepository.createPlatformCoupon(payload);
+  }
+
+  deactivatePlatformCoupon(couponId: string) {
+    return adminRepository.deactivatePlatformCoupon(couponId);
+  }
+
+  getAuditLogs(query?: string, limit?: number) {
+    return adminRepository.getAuditLogs(query, limit);
+  }
+
+  getBillingInvoices() {
+    return adminRepository.getBillingInvoices();
+  }
+
+  getCampaignTargets(audience: string) {
+    return adminRepository.getCampaignTargets(audience);
+  }
 }
 
 export const adminService = new AdminService();

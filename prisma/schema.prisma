@@ -489,3 +489,31 @@ model ApiAccessConfig {
   @@map("api_access_configs")
 }
 
+model PlatformCoupon {
+  couponId       BigInt    @id @default(autoincrement()) @map("coupon_id")
+  code           String    @unique @db.VarChar(50)
+  discountType   String    @map("discount_type") @db.VarChar(20) // "PERCENTAGE", "FLAT"
+  discountValue  Decimal   @map("discount_value") @db.Decimal(10, 2)
+  maxRedemptions Int       @default(100) @map("max_redemptions")
+  usedCount      Int       @default(0) @map("used_count")
+  expiryDate     DateTime? @map("expiry_date") @db.Timestamptz
+  isActive       Boolean   @default(true) @map("is_active")
+  addedDate      DateTime  @default(now()) @map("added_date") @db.Timestamptz
+
+  @@map("platform_coupons")
+}
+
+model AuditLog {
+  logId       BigInt   @id @default(autoincrement()) @map("log_id")
+  companyId   BigInt?  @map("company_id")
+  performedBy String   @map("performed_by") @db.VarChar(100)
+  actionType  String   @map("action_type") @db.VarChar(50) // "PLAN_CHANGE", "PRODUCT_EDIT", "ORDER_OVERRIDE", "SECURITY"
+  details     String   @db.Text
+  ipAddress   String?  @map("ip_address") @db.VarChar(45)
+  addedDate   DateTime @default(now()) @map("added_date") @db.Timestamptz
+
+  @@index([companyId])
+  @@index([actionType])
+  @@map("audit_logs")
+}
+
