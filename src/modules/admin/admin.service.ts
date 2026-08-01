@@ -114,6 +114,49 @@ export class AdminService {
   listSystemBroadcasts() {
     return adminRepository.listSystemBroadcasts();
   }
+
+  inspectMerchantStore(companyId: string) {
+    return adminRepository.inspectMerchantStore(companyId);
+  }
+
+  resetOwnerPassword(companyId: string) {
+    return adminRepository.resetOwnerPassword(companyId);
+  }
+
+  searchGlobalProducts(query: string, companyId?: string | null, limit?: number) {
+    return adminRepository.searchGlobalProducts(query, companyId, limit);
+  }
+
+  updateGlobalProductStockOrPrice(productId: string, payload: { price?: number; stock?: number; is_deleted?: boolean }) {
+    return adminRepository.updateGlobalProductStockOrPrice(productId, payload);
+  }
+
+  searchGlobalOrders(query: string, limit?: number) {
+    return adminRepository.searchGlobalOrders(query, limit);
+  }
+
+  updateGlobalOrderStatus(orderId: string, status: string) {
+    return adminRepository.updateGlobalOrderStatus(orderId, status);
+  }
+
+  searchCustomerGovernance(phone: string) {
+    return adminRepository.searchCustomerGovernance(phone);
+  }
+
+  toggleCustomerBlacklist(phone: string, reason: string | null, isBlacklisted: boolean) {
+    return adminRepository.toggleCustomerBlacklist(phone, reason, isBlacklisted);
+  }
+
+  listApiAccessConfigs() {
+    return adminRepository.listApiAccessConfigs();
+  }
+
+  updateApiAccessConfig(
+    companyId: string,
+    payload: { quota?: string; rate_limit_per_minute?: number | null; is_revoked?: boolean },
+  ) {
+    return adminRepository.updateApiAccessConfig(companyId, payload);
+  }
 }
 
 export const adminService = new AdminService();

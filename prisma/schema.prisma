@@ -467,3 +467,25 @@ model SystemBroadcast {
   @@map("system_broadcasts")
 }
 
+model BlacklistedCustomer {
+  id            BigInt   @id @default(autoincrement()) @map("blacklist_id")
+  phone         String   @unique @db.VarChar(20)
+  reason        String?  @db.Text
+  isBlacklisted Boolean  @default(true) @map("is_blacklisted")
+  addedDate     DateTime @default(now()) @map("added_date") @db.Timestamptz
+  updatedDate   DateTime? @map("updated_date") @db.Timestamptz
+
+  @@map("blacklisted_customers")
+}
+
+model ApiAccessConfig {
+  id                 BigInt   @id @default(autoincrement()) @map("api_access_id")
+  companyId          BigInt   @unique @map("company_id")
+  quota              String   @default("UNLIMITED") @db.VarChar(40)
+  rateLimitPerMinute Int?     @map("rate_limit_per_minute")
+  isRevoked          Boolean  @default(false) @map("is_revoked")
+  updatedDate        DateTime @default(now()) @map("updated_date") @db.Timestamptz
+
+  @@map("api_access_configs")
+}
+

@@ -1040,6 +1040,503 @@ export class AdminRepository {
       return [];
     }
   }
+
+  private async ensureGovernanceTables() {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "blacklisted_customers" (
+        "blacklist_id" BIGSERIAL PRIMARY KEY,
+        "phone" VARCHAR(20) NOT NULL UNIQUE,
+        "reason" TEXT,
+        "is_blacklisted" BOOLEAN NOT NULL DEFAULT true,
+        "added_date" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updated_date" TIMESTAMPTZ
+      )
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "api_access_configs" (
+        "api_access_id" BIGSERIAL PRIMARY KEY,
+        "company_id" BIGINT NOT NULL UNIQUE,
+        "quota" VARCHAR(40) NOT NULL DEFAULT 'UNLIMITED',
+        "rate_limit_per_minute" INTEGER,
+        "is_revoked" BOOLEAN NOT NULL DEFAULT false,
+        "updated_date" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  }
+
+  async inspectMerchantStore(companyId: string) {
+    const compId = BigInt(companyId);
+    const company = await prisma.company.findUnique({
+      where: { companyId: compId },
+      include: {
+        addedByUser: true,
+        subscription: true,
+        _count: {
+          select: {
+            catalogues: { where: { isDeleted: false } },
+            products: { where: { isDeleted: false } },
+            orders: true,
+            customerGroups: true,
+          },
+        },
+      },
+    });
+    if (!company) throw new Error('Company not found');
+
+    const orderAgg = await prisma.order.aggregate({
+      where: { companyId: compId },
+      _sum: { total: true },
+      _count: { orderId: true },
+    });
+
+    const groups = await prisma.customerGroup.findMany({
+      where: { companyId: compId },
+      include: { _count: { select: { members: true } } },
+      orderBy: { id: 'desc' },
+    });
+
+    const recentOrders = await prisma.order.findMany({
+      where: { companyId: compId },
+      orderBy: { addedDate: 'desc' },
+      take: 10,
+      select: {
+        orderId: true,
+        customerName: true,
+        customerPhone: true,
+        status: true,
+        total: true,
+        addedDate: true,
+      },
+    });
+
+    const recentEvents = await prisma.analyticsEvent.findMany({
+      where: { companyId: compId },
+      orderBy: { addedDate: 'desc' },
+      take: 15,
+    });
+
+    return {
+      company: {
+        company_id: company.companyId.toString(),
+        company_name: company.companyName,
+        logo: company.logoImgPath,
+        phone: company.phone || company.addedByUser?.mobileNo || null,
+        email: company.email || company.addedByUser?.emailId || null,
+        owner_name: company.addedByUser
+          ? `${company.addedByUser.firstName} ${company.addedByUser.lastName || ''}`.trim()
+          : 'Unknown',
+        owner_user_id: company.addedByUser?.userId?.toString() || null,
+        subdomain: company.subdomain,
+        custom_domain: company.customDomain,
+        added_date: company.addedDate.toISOString(),
+      },
+      subscription: company.subscription
+        ? {
+            plan_name: company.subscription.planName,
+            status: company.subscription.status,
+            end_date: company.subscription.endDate?.toISOString() || null,
+            additional_products: company.subscription.additionalProducts,
+          }
+        : null,
+      counts: {
+        catalogues: company._count.catalogues,
+        products: company._count.products,
+        orders: company._count.orders,
+        customer_groups: company._count.customerGroups,
+      },
+      order_stats: {
+        total_orders: orderAgg._count.orderId,
+        total_gmv: Number(orderAgg._sum.total || 0),
+      },
+      customer_groups: groups.map((g) => ({
+        id: g.id.toString(),
+        name: g.name,
+        members: g._count.members,
+      })),
+      recent_orders: recentOrders.map((o) => ({
+        order_id: o.orderId.toString(),
+        customer_name: o.customerName,
+        customer_phone: o.customerPhone,
+        status: o.status,
+        total: Number(o.total),
+        added_date: o.addedDate.toISOString(),
+      })),
+      recent_activity: recentEvents.map((e) => ({
+        id: e.id.toString(),
+        event_type: e.eventType,
+        event_value: e.eventValue,
+        added_date: e.addedDate.toISOString(),
+      })),
+    };
+  }
+
+  async resetOwnerPassword(companyId: string) {
+    const company = await prisma.company.findUnique({
+      where: { companyId: BigInt(companyId) },
+      include: { addedByUser: true },
+    });
+    if (!company?.addedByUser) throw new Error('Owner not found for company');
+
+    const bcrypt = await import('bcryptjs');
+    const tempPin = String(Math.floor(100000 + Math.random() * 900000));
+    const hash = await bcrypt.hash(tempPin, 10);
+    await prisma.user.update({
+      where: { userId: company.addedByUser.userId },
+      data: { password: hash },
+    });
+
+    return {
+      company_id: companyId,
+      owner_user_id: company.addedByUser.userId.toString(),
+      temporary_pin: tempPin,
+      message: 'Temporary PIN set for owner login. Share securely and ask them to change password.',
+    };
+  }
+
+  async searchGlobalProducts(query: string, companyId?: string | null, limit = 50) {
+    const take = Math.min(Math.max(Number(limit) || 50, 1), 100);
+    const q = (query || '').trim();
+    const where: any = { isDeleted: false };
+    if (companyId) where.companyId = BigInt(companyId);
+    if (q) {
+      where.OR = [
+        { product: { contains: q, mode: 'insensitive' } },
+        { sku: { contains: q, mode: 'insensitive' } },
+        { catalogue: { catalogue: { contains: q, mode: 'insensitive' } } },
+      ];
+    }
+
+    const products = await prisma.product.findMany({
+      where,
+      take,
+      orderBy: { productId: 'desc' },
+      include: {
+        company: { select: { companyName: true, companyId: true } },
+        catalogue: { select: { catalogue: true } },
+        images: { take: 1, select: { productImgPath: true } },
+        inventories: { select: { quantity: true } },
+      },
+    });
+
+    return products.map((p) => {
+      const stock = p.inventories.reduce((sum, inv) => sum + (inv.quantity || 0), 0);
+      return {
+        product_id: p.productId.toString(),
+        name: p.product,
+        sku: p.sku,
+        category: p.catalogue?.catalogue || null,
+        price: Number(p.price || 0),
+        stock,
+        is_deleted: p.isDeleted,
+        thumbnail: p.images[0]?.productImgPath || null,
+        company_id: p.company.companyId.toString(),
+        company_name: p.company.companyName,
+      };
+    });
+  }
+
+  async updateGlobalProductStockOrPrice(
+    productId: string,
+    payload: { price?: number; stock?: number; is_deleted?: boolean },
+  ) {
+    const pid = BigInt(productId);
+    const product = await prisma.product.findUnique({ where: { productId: pid } });
+    if (!product) throw new Error('Product not found');
+
+    const updated = await prisma.product.update({
+      where: { productId: pid },
+      data: {
+        ...(payload.price !== undefined ? { price: payload.price } : {}),
+        ...(payload.is_deleted !== undefined ? { isDeleted: Boolean(payload.is_deleted) } : {}),
+        updatedDate: new Date(),
+      },
+    });
+
+    if (payload.stock !== undefined) {
+      const inv = await prisma.productVariantInventory.findFirst({ where: { productId: pid } });
+      if (inv) {
+        await prisma.productVariantInventory.update({
+          where: { inventoryId: inv.inventoryId },
+          data: { quantity: Number(payload.stock) },
+        });
+      } else {
+        await prisma.productVariantInventory.create({
+          data: { productId: pid, quantity: Number(payload.stock) },
+        });
+      }
+    }
+
+    const stockRows = await prisma.productVariantInventory.findMany({
+      where: { productId: pid },
+      select: { quantity: true },
+    });
+
+    return {
+      product_id: updated.productId.toString(),
+      price: Number(updated.price || 0),
+      is_deleted: updated.isDeleted,
+      stock: stockRows.reduce((s, r) => s + r.quantity, 0),
+    };
+  }
+
+  async searchGlobalOrders(query: string, limit = 50) {
+    const take = Math.min(Math.max(Number(limit) || 50, 1), 100);
+    const q = (query || '').trim();
+    const where: any = {};
+    if (q) {
+      const or: any[] = [
+        { customerName: { contains: q, mode: 'insensitive' } },
+        { customerPhone: { contains: q } },
+      ];
+      if (/^\d+$/.test(q)) {
+        try {
+          or.push({ orderId: BigInt(q) });
+        } catch {
+          /* ignore */
+        }
+      }
+      where.OR = or;
+    }
+
+    const orders = await prisma.order.findMany({
+      where,
+      take,
+      orderBy: { addedDate: 'desc' },
+      include: {
+        company: { select: { companyName: true, companyId: true, phone: true } },
+        items: true,
+      },
+    });
+
+    return orders.map((o) => ({
+      order_id: o.orderId.toString(),
+      company_id: o.company.companyId.toString(),
+      company_name: o.company.companyName,
+      customer_name: o.customerName,
+      customer_phone: o.customerPhone,
+      customer_address: o.customerAddress,
+      status: o.status,
+      subtotal: Number(o.subtotal),
+      discount: Number(o.discount),
+      shipping: Number(o.shipping),
+      total: Number(o.total),
+      added_date: o.addedDate.toISOString(),
+      items: o.items.map((it) => ({
+        title: it.title,
+        qty: it.qty,
+        price: Number(it.price),
+        product_id: it.productId.toString(),
+      })),
+    }));
+  }
+
+  async updateGlobalOrderStatus(orderId: string, status: string) {
+    const allowed = ['PENDING', 'UNCONFIRMED', 'CONFIRMED', 'ACCEPTED', 'DONE', 'DECLINED', 'CANCELLED', 'COMPLETED'];
+    const normalized = String(status || '').toUpperCase();
+    if (!allowed.includes(normalized)) throw new Error(`Invalid status. Allowed: ${allowed.join(', ')}`);
+
+    const order = await prisma.order.update({
+      where: { orderId: BigInt(orderId) },
+      data: { status: normalized },
+      include: {
+        company: { select: { companyName: true, phone: true } },
+        items: true,
+      },
+    });
+
+    const itemLines = order.items
+      .map((it, idx) => `${idx + 1}. ${it.title} x${it.qty} — ₹${Number(it.price) * it.qty}`)
+      .join('\n');
+    const whatsapp_preview =
+      `Order #${order.orderId} — ${order.company.companyName}\n` +
+      `Customer: ${order.customerName} (${order.customerPhone})\n` +
+      `Status: ${order.status}\n` +
+      `${itemLines}\n` +
+      `Total: ₹${Number(order.total).toFixed(2)}`;
+
+    return {
+      order_id: order.orderId.toString(),
+      status: order.status,
+      whatsapp_preview,
+    };
+  }
+
+  async searchCustomerGovernance(phone: string) {
+    await this.ensureGovernanceTables();
+    const digits = (phone || '').replace(/\D/g, '');
+    const last10 = digits.slice(-10);
+    if (!last10) throw new Error('Valid phone is required');
+
+    const orders = await prisma.order.findMany({
+      where: { customerPhone: { contains: last10 } },
+      include: { company: { select: { companyId: true, companyName: true } } },
+      orderBy: { addedDate: 'desc' },
+      take: 100,
+    });
+
+    const members = await prisma.customerGroupMember.findMany({
+      where: { customerPhone: { contains: last10 } },
+      include: {
+        group: {
+          select: {
+            id: true,
+            name: true,
+            companyId: true,
+            company: { select: { companyName: true } },
+          },
+        },
+      },
+      take: 50,
+    });
+
+    const totalSpent = orders.reduce((s, o) => s + Number(o.total || 0), 0);
+    const stores = new Map<string, string>();
+    orders.forEach((o) => stores.set(o.company.companyId.toString(), o.company.companyName));
+
+    let blacklist: any = null;
+    try {
+      blacklist = await prisma.blacklistedCustomer.findUnique({ where: { phone: last10 } });
+    } catch {
+      blacklist = null;
+    }
+
+    return {
+      phone: last10,
+      total_orders: orders.length,
+      total_spent: Number(totalSpent.toFixed(2)),
+      stores_visited: [...stores.entries()].map(([company_id, company_name]) => ({
+        company_id,
+        company_name,
+      })),
+      orders: orders.slice(0, 30).map((o) => ({
+        order_id: o.orderId.toString(),
+        company_name: o.company.companyName,
+        status: o.status,
+        total: Number(o.total),
+        added_date: o.addedDate.toISOString(),
+      })),
+      group_memberships: members.map((m) => ({
+        group_id: m.group.id.toString(),
+        group_name: m.group.name,
+        company_name: m.group.company.companyName,
+        customer_name: m.customerName,
+      })),
+      blacklist: blacklist
+        ? {
+            is_blacklisted: blacklist.isBlacklisted,
+            reason: blacklist.reason,
+            updated_date: blacklist.updatedDate?.toISOString() || blacklist.addedDate.toISOString(),
+          }
+        : { is_blacklisted: false, reason: null, updated_date: null },
+    };
+  }
+
+  async toggleCustomerBlacklist(phone: string, reason: string | null, isBlacklisted: boolean) {
+    await this.ensureGovernanceTables();
+    const last10 = (phone || '').replace(/\D/g, '').slice(-10);
+    if (!last10) throw new Error('Valid phone is required');
+
+    const row = await prisma.blacklistedCustomer.upsert({
+      where: { phone: last10 },
+      update: {
+        isBlacklisted: Boolean(isBlacklisted),
+        reason: reason || null,
+        updatedDate: new Date(),
+      },
+      create: {
+        phone: last10,
+        isBlacklisted: Boolean(isBlacklisted),
+        reason: reason || null,
+      },
+    });
+
+    return {
+      phone: row.phone,
+      is_blacklisted: row.isBlacklisted,
+      reason: row.reason,
+    };
+  }
+
+  async listApiAccessConfigs() {
+    await this.ensureGovernanceTables();
+    const companies = await prisma.company.findMany({
+      where: { isDeleted: false },
+      include: {
+        addedByUser: { select: { userId: true, mobileNo: true, emailId: true, lastActiveTime: true, pushToken: true } },
+        subscription: { select: { planName: true, status: true } },
+      },
+      orderBy: { companyId: 'desc' },
+      take: 100,
+    });
+
+    const configs = await prisma.apiAccessConfig.findMany();
+    const configMap = new Map(configs.map((c) => [c.companyId.toString(), c]));
+
+    return companies.map((c) => {
+      const cfg = configMap.get(c.companyId.toString());
+      return {
+        company_id: c.companyId.toString(),
+        company_name: c.companyName,
+        plan_name: c.subscription?.planName || 'FREE',
+        owner_phone: c.addedByUser?.mobileNo || c.phone,
+        owner_email: c.addedByUser?.emailId || c.email,
+        has_push_token: Boolean(c.addedByUser?.pushToken),
+        last_active: c.addedByUser?.lastActiveTime?.toISOString() || null,
+        quota: cfg?.quota || 'UNLIMITED',
+        rate_limit_per_minute: cfg?.rateLimitPerMinute ?? null,
+        is_revoked: cfg?.isRevoked || false,
+      };
+    });
+  }
+
+  async updateApiAccessConfig(
+    companyId: string,
+    payload: { quota?: string; rate_limit_per_minute?: number | null; is_revoked?: boolean },
+  ) {
+    await this.ensureGovernanceTables();
+    const compId = BigInt(companyId);
+    const company = await prisma.company.findUnique({ where: { companyId: compId } });
+    if (!company) throw new Error('Company not found');
+
+    const row = await prisma.apiAccessConfig.upsert({
+      where: { companyId: compId },
+      update: {
+        ...(payload.quota !== undefined ? { quota: payload.quota } : {}),
+        ...(payload.rate_limit_per_minute !== undefined
+          ? { rateLimitPerMinute: payload.rate_limit_per_minute }
+          : {}),
+        ...(payload.is_revoked !== undefined ? { isRevoked: Boolean(payload.is_revoked) } : {}),
+        updatedDate: new Date(),
+      },
+      create: {
+        companyId: compId,
+        quota: payload.quota || 'UNLIMITED',
+        rateLimitPerMinute: payload.rate_limit_per_minute ?? null,
+        isRevoked: Boolean(payload.is_revoked),
+      },
+    });
+
+    // Soft-revoke: clear owner / staff push tokens when session revoked
+    if (payload.is_revoked) {
+      if (company.addedBy) {
+        await prisma.user.update({
+          where: { userId: company.addedBy },
+          data: { pushToken: null },
+        }).catch(() => undefined);
+      }
+      await prisma.user.updateMany({
+        where: { companyId: compId },
+        data: { pushToken: null },
+      });
+    }
+
+    return {
+      company_id: companyId,
+      quota: row.quota,
+      rate_limit_per_minute: row.rateLimitPerMinute,
+      is_revoked: row.isRevoked,
+    };
+  }
 }
 
 export const adminRepository = new AdminRepository();

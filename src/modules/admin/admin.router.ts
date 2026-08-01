@@ -34,4 +34,16 @@ router.post('/company/:companyId/override', validateAuth, adminController.update
 router.post('/system/broadcast', validateAuth, adminController.createSystemBroadcastBanner);
 router.get('/system/broadcasts', validateAuth, adminController.listSystemBroadcasts);
 
+// Micro-Management Governance
+router.get('/micro/store/:companyId', validateAuth, adminController.inspectMerchantStore);
+router.post('/micro/store/:companyId/reset-password', validateAuth, adminController.resetOwnerPassword);
+router.get('/micro/products', validateAuth, adminController.searchGlobalProducts);
+router.put('/micro/products/:productId', validateAuth, adminController.updateGlobalProduct);
+router.get('/micro/orders', validateAuth, adminController.searchGlobalOrders);
+router.put('/micro/orders/:orderId/status', validateAuth, adminController.updateGlobalOrderStatus);
+router.get('/micro/customers', validateAuth, adminController.searchCustomerGovernance);
+router.post('/micro/customers/blacklist', validateAuth, adminController.toggleCustomerBlacklist);
+router.get('/micro/api-access', validateAuth, adminController.listApiAccessConfigs);
+router.put('/micro/api-access/:companyId', validateAuth, adminController.updateApiAccessConfig);
+
 export const adminRouter = router;

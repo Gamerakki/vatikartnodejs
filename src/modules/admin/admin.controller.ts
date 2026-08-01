@@ -297,6 +297,123 @@ export class AdminController {
       res.status(500).json({ status: false, msg: (err as Error).message });
     }
   }
+
+  async inspectMerchantStore(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.inspectMerchantStore(req.params.companyId);
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      const msg = (err as Error).message;
+      res.status(msg === 'Company not found' ? 404 : 500).json({ status: false, msg });
+    }
+  }
+
+  async resetOwnerPassword(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.resetOwnerPassword(req.params.companyId);
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async searchGlobalProducts(req: Request, res: Response): Promise<void> {
+    try {
+      const query = String(req.query.q || req.query.query || '');
+      const companyId = req.query.companyId ? String(req.query.companyId) : null;
+      const limit = req.query.limit ? Number(req.query.limit) : 50;
+      const data = await adminService.searchGlobalProducts(query, companyId, limit);
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async updateGlobalProduct(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.updateGlobalProductStockOrPrice(req.params.productId, req.body || {});
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      const msg = (err as Error).message;
+      res.status(msg === 'Product not found' ? 404 : 500).json({ status: false, msg });
+    }
+  }
+
+  async searchGlobalOrders(req: Request, res: Response): Promise<void> {
+    try {
+      const query = String(req.query.q || req.query.query || '');
+      const limit = req.query.limit ? Number(req.query.limit) : 50;
+      const data = await adminService.searchGlobalOrders(query, limit);
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async updateGlobalOrderStatus(req: Request, res: Response): Promise<void> {
+    try {
+      const { status } = req.body as { status?: string };
+      if (!status) {
+        res.status(400).json({ status: false, msg: 'status is required' });
+        return;
+      }
+      const data = await adminService.updateGlobalOrderStatus(req.params.orderId, status);
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async searchCustomerGovernance(req: Request, res: Response): Promise<void> {
+    try {
+      const phone = String(req.query.phone || req.body?.phone || '');
+      const data = await adminService.searchCustomerGovernance(phone);
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(400).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async toggleCustomerBlacklist(req: Request, res: Response): Promise<void> {
+    try {
+      const { phone, reason, is_blacklisted } = req.body as {
+        phone?: string;
+        reason?: string;
+        is_blacklisted?: boolean;
+      };
+      if (!phone) {
+        res.status(400).json({ status: false, msg: 'phone is required' });
+        return;
+      }
+      const data = await adminService.toggleCustomerBlacklist(
+        phone,
+        reason || null,
+        is_blacklisted !== false,
+      );
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async listApiAccessConfigs(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.listApiAccessConfigs();
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async updateApiAccessConfig(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.updateApiAccessConfig(req.params.companyId, req.body || {});
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      const msg = (err as Error).message;
+      res.status(msg === 'Company not found' ? 404 : 500).json({ status: false, msg });
+    }
+  }
 }
 
 export const adminController = new AdminController();
