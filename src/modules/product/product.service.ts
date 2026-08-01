@@ -224,8 +224,8 @@ export class ProductService {
   }
 
   async uploadProductUrlGen(req: ProductFileUploadRequest): Promise<R2UploadURL[]> {
-    if (req.files.length === 0 || req.files.length > 20) {
-      throw new Error('Upload file count should be less than 20 per upload.');
+    if (req.files.length === 0 || req.files.length > 100) {
+      throw new Error('Upload file count should be between 1 and 100 per request.');
     }
 
     const result: R2UploadURL[] = [];
@@ -248,6 +248,10 @@ export class ProductService {
     loggedInUserId: number,
     req: CreateProductBatchReq
   ): Promise<SaveProductRes[]> {
+    if (req.products.length === 0 || req.products.length > 100) {
+      throw new Error('Bulk create allows at most 100 products per request.');
+    }
+
     const companyId = await companyRepository.fetchCompanyIDViaUserId(loggedInUserId);
 
     const limits = await getCompanyPlanLimits(companyId);

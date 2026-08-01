@@ -38,6 +38,19 @@ export class ProductController {
   }
 
   async uploadProductUrlGenerator(req: Request, res: Response): Promise<void> {
+    if (
+      !req.body?.files
+      || !Array.isArray(req.body.files)
+      || req.body.files.length === 0
+      || req.body.files.length > 100
+    ) {
+      res.status(400).json({
+        status: false,
+        msg: 'Upload file count should be between 1 and 100 per request.',
+      });
+      return;
+    }
+
     const parseResult = productFileUploadSchema.safeParse(req.body);
 
     if (!parseResult.success) {
@@ -65,13 +78,24 @@ export class ProductController {
     } catch (err) {
       res.status(400).json({
         status: false,
-        msg: 'Upload file count should be less than 20 per upload.',
+        msg: 'Upload file count should be between 1 and 100 per request.',
         error: (err as Error).message,
       });
     }
   }
 
   async createProduct(req: Request, res: Response): Promise<void> {
+    if (
+      Array.isArray(req.body?.products)
+      && req.body.products.length > 100
+    ) {
+      res.status(400).json({
+        status: false,
+        msg: 'Bulk create allows at most 100 products per request.',
+      });
+      return;
+    }
+
     const parseResult = createProductBatchSchema.safeParse(req.body);
 
     if (!parseResult.success) {

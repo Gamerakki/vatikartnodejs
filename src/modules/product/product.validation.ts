@@ -8,7 +8,10 @@ export const productFileSchema = z.object({
 });
 
 export const productFileUploadSchema = z.object({
-  files: z.array(productFileSchema).min(1, { message: 'The field files must have at least 1 item' }),
+  files: z
+    .array(productFileSchema)
+    .min(1, { message: 'The field files must have at least 1 item' })
+    .max(100, { message: 'Upload file count should be between 1 and 100 per request.' }),
 });
 
 export const createProductSchema = z.object({
@@ -28,7 +31,10 @@ export const createProductSchema = z.object({
 
 export const createProductBatchSchema = z.object({
   catalogue_id: z.number({ required_error: 'The field catalogue_id is required' }),
-  products: z.array(createProductSchema).min(1, { message: 'The field products must have at least 1 item' }),
+  products: z
+    .array(createProductSchema)
+    .min(1, { message: 'The field products must have at least 1 item' })
+    .max(100, { message: 'Bulk create allows at most 100 products per request.' }),
 });
 
 export const bulkDiscountSlabSchema = z.object({
