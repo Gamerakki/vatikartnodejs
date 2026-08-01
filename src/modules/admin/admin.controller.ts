@@ -224,6 +224,79 @@ export class AdminController {
       res.status(500).json({ status: false, msg: (err as Error).message });
     }
   }
+
+  async getExecutiveGrowthMetrics(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.getExecutiveGrowthMetrics();
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async getConversionFunnelMetrics(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.getConversionFunnelMetrics();
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async getSystemHealthAndStorage(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.getSystemHealthAndStorage();
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async updateMerchantStatusAndPlan(req: Request, res: Response): Promise<void> {
+    try {
+      const { companyId } = req.params;
+      if (!companyId) {
+        res.status(400).json({ status: false, msg: 'companyId is required' });
+        return;
+      }
+      const data = await adminService.updateMerchantStatusAndPlan(companyId, req.body || {});
+      res.status(200).json({ status: true, msg: 'Merchant updated', data });
+    } catch (err) {
+      const msg = (err as Error).message;
+      res.status(msg === 'Company not found' ? 404 : 500).json({ status: false, msg });
+    }
+  }
+
+  async createSystemBroadcastBanner(req: Request, res: Response): Promise<void> {
+    try {
+      const { message, target_role, expiry_date } = req.body as {
+        message?: string;
+        target_role?: string;
+        expiry_date?: string | null;
+      };
+      if (!message || !message.trim()) {
+        res.status(400).json({ status: false, msg: 'message is required' });
+        return;
+      }
+      const data = await adminService.createSystemBroadcastBanner(
+        message.trim(),
+        target_role || 'ALL',
+        expiry_date,
+      );
+      res.status(200).json({ status: true, msg: 'Broadcast created', data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
+  async listSystemBroadcasts(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await adminService.listSystemBroadcasts();
+      res.status(200).json({ status: true, data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
 }
 
 export const adminController = new AdminController();

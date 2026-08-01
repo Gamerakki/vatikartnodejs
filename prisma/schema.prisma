@@ -456,3 +456,14 @@ model BusinessEnquiry {
   @@map("business_enquiries")
 }
 
+model SystemBroadcast {
+  id          BigInt    @id @default(autoincrement()) @map("broadcast_id")
+  message     String    @db.Text
+  targetRole  String    @default("ALL") @map("target_role") @db.VarChar(40)
+  expiryDate  DateTime? @map("expiry_date") @db.Timestamptz
+  isActive    Boolean   @default(true) @map("is_active")
+  addedDate   DateTime  @default(now()) @map("added_date") @db.Timestamptz
+
+  @@map("system_broadcasts")
+}
+

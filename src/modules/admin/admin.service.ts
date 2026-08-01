@@ -81,6 +81,39 @@ export class AdminService {
   getOfflineSyncDiagnostics() {
     return adminRepository.getOfflineSyncDiagnostics();
   }
+
+  getExecutiveGrowthMetrics() {
+    return adminRepository.getExecutiveGrowthMetrics();
+  }
+
+  getConversionFunnelMetrics() {
+    return adminRepository.getConversionFunnelMetrics();
+  }
+
+  getSystemHealthAndStorage() {
+    return adminRepository.getSystemHealthAndStorage();
+  }
+
+  updateMerchantStatusAndPlan(
+    companyId: string,
+    payload: {
+      status?: string;
+      plan_name?: string;
+      additional_products?: number;
+      extend_months?: number;
+      end_date?: string | null;
+    },
+  ) {
+    return adminRepository.updateMerchantStatusAndPlan(companyId, payload);
+  }
+
+  createSystemBroadcastBanner(message: string, targetRole: string, expiryDate?: string | null) {
+    return adminRepository.createSystemBroadcastBanner(message, targetRole, expiryDate);
+  }
+
+  listSystemBroadcasts() {
+    return adminRepository.listSystemBroadcasts();
+  }
 }
 
 export const adminService = new AdminService();

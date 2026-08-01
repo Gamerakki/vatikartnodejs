@@ -26,4 +26,12 @@ router.put('/companies/:companyId/whatsapp-template', validateAuth, adminControl
 router.get('/analytics/advanced', validateAuth, adminController.getAdvancedAnalytics);
 router.get('/sync-diagnostics', validateAuth, adminController.getOfflineSyncDiagnostics);
 
+// Executive Growth & Control Suite
+router.get('/growth/executive', validateAuth, adminController.getExecutiveGrowthMetrics);
+router.get('/growth/conversion', validateAuth, adminController.getConversionFunnelMetrics);
+router.get('/system/health', validateAuth, adminController.getSystemHealthAndStorage);
+router.post('/company/:companyId/override', validateAuth, adminController.updateMerchantStatusAndPlan);
+router.post('/system/broadcast', validateAuth, adminController.createSystemBroadcastBanner);
+router.get('/system/broadcasts', validateAuth, adminController.listSystemBroadcasts);
+
 export const adminRouter = router;
