@@ -81,6 +81,7 @@ app.use('/master', socialMediaRouter);
 app.use('/order', orderRouter);
 app.use('/admin', adminRouter);
 app.use('/analytics', analyticsRouter);
+app.use('/api/analytics', analyticsRouter);
 app.use('/customer-group', customerGroupRouter);
 app.use('/whatsapp-template', whatsappTemplateRouter);
 

@@ -164,6 +164,39 @@ export class AnalyticsController {
       });
     }
   }
+
+  /**
+   * Public marketing / landing-page event logger.
+   * Accepts event_type, client_ip, details and stores an AuditLog row.
+   */
+  async logMarketingEvent(req: Request, res: Response): Promise<void> {
+    try {
+      const body = req.body || {};
+      const eventType = String(body.event_type || body.eventType || 'LANDING_PAGE_VISIT').slice(0, 50);
+      const details = String(body.details || body.detail || 'Landing page visit').slice(0, 4000);
+      const clientIp = String(
+        body.client_ip
+        || body.clientIp
+        || req.headers['x-forwarded-for']
+        || req.socket.remoteAddress
+        || '',
+      ).slice(0, 45);
+
+      await prisma.auditLog.create({
+        data: {
+          companyId: null,
+          performedBy: 'landing_visitor',
+          actionType: eventType,
+          details,
+          ipAddress: clientIp || null,
+        },
+      });
+
+      res.status(200).json({ status: true, msg: 'Logged' });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: 'An error occurred', error: (err as Error).message });
+    }
+  }
 }
 
 export const analyticsController = new AnalyticsController();
