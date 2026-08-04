@@ -9,6 +9,9 @@ router.post('/public/book', orderController.bookOrder);
 router.get('/public/customer/:phone', orderController.fetchPublicOrdersByCustomerPhone);
 router.post('/public/activity', orderController.trackStorefrontActivity);
 
+// OTP-protected buyer order history
+router.get('/my-orders', orderController.fetchMyOrders);
+
 // All other order routes require auth
 router.use(validateAuth);
 

@@ -11,6 +11,7 @@ import {
   updateOrderShippingSchema,
   bookOrderSchema,
 } from './order.validation';
+import { otpService } from '../otp/otp.service';
 
 async function downloadBrochureImage(url: string): Promise<Buffer | null> {
   if (!url) return null;
@@ -40,6 +41,13 @@ export class OrderController {
     }
 
     try {
+      // Prefer OTP session when provided; keep legacy public route for backwards compatibility
+      // but require verification when OTP_REQUIRE_FOR_ORDERS=true
+      if (process.env.OTP_REQUIRE_FOR_ORDERS === 'true') {
+        const auth = String(req.headers.authorization || req.headers['x-otp-session'] || '');
+        otpService.assertVerifiedSession(auth, phone);
+      }
+
       const orders = await orderService.fetchPublicOrdersByCustomerPhone(phone);
       res.status(200).json({
         status: true,
@@ -47,10 +55,35 @@ export class OrderController {
         data: orders,
       });
     } catch (err) {
-      res.status(500).json({
+      const msg = (err as Error).message;
+      const status = msg.includes('OTP') ? 401 : 500;
+      res.status(status).json({
         status: false,
-        msg: 'An error occurred',
-        error: (err as Error).message,
+        msg: status === 401 ? msg : 'An error occurred',
+        error: msg,
+      });
+    }
+  }
+
+  async fetchMyOrders(req: Request, res: Response): Promise<void> {
+    try {
+      const auth = String(req.headers.authorization || req.headers['x-otp-session'] || '');
+      const queryPhone = String(req.query.phone || req.query.verified_phone || '');
+      const verifiedPhone = otpService.assertVerifiedSession(auth, queryPhone || undefined);
+      const orders = await orderService.fetchPublicOrdersByCustomerPhone(verifiedPhone);
+      res.status(200).json({
+        status: true,
+        msg: 'Customer orders fetched successfully!',
+        data: orders,
+        verified_phone: verifiedPhone,
+      });
+    } catch (err) {
+      const msg = (err as Error).message;
+      const status = msg.includes('OTP') || msg.includes('token') || msg.includes('authorization') ? 401 : 500;
+      res.status(status).json({
+        status: false,
+        msg: status === 401 ? 'OTP verification required' : 'An error occurred',
+        error: msg,
       });
     }
   }
@@ -259,10 +292,10 @@ export class OrderController {
       });
     } catch (err) {
       const msg = (err as Error).message;
-      const httpStatus = msg === 'Catalogue not found' ? 404 : 500;
+      const httpStatus = msg === 'Catalogue not found' ? 404 : 400;
       res.status(httpStatus).json({
         status: false,
-        msg: msg === 'Catalogue not found' ? 'Catalogue not found' : 'An error occurred',
+        msg: msg === 'Catalogue not found' ? 'Catalogue not found' : (msg || 'Failed to save order to database.'),
         error: msg,
       });
     }
