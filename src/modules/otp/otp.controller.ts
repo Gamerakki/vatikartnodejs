@@ -9,7 +9,6 @@ export class OtpController {
       res.status(200).json({
         status: true,
         msg: 'OTP sent successfully',
-        otp_demo: result.otp,
         phone: result.phone,
       });
     } catch (err) {
