@@ -579,3 +579,11 @@ model OtpVerification {
   @@map("otp_verifications")
 }
 
+model WhatsAppBotAuth {
+  key       String   @id @db.VarChar(255)
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("whatsapp_bot_auth")
+}
+
