@@ -99,6 +99,11 @@ async function bootstrap() {
     logger.info(`Server started on port :${port}`);
   });
 
+  // Start Baileys WhatsApp bot (QR scan required on first boot)
+  void import('./utils/whatsappBot')
+    .then(({ initWhatsAppBot }) => initWhatsAppBot())
+    .catch((err) => logger.warn('[WhatsApp Bot] init skipped/failed', err));
+
   // Graceful shutdown
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}. Shutting down server gracefully...`);

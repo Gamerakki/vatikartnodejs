@@ -35,3 +35,6 @@ Thumbs.db
 *.sln
 *.sw?
 firebase-service-account.json
+
+# Baileys WhatsApp Web auth session (do not commit)
+baileys_auth_info/

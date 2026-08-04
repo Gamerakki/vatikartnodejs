@@ -1,42 +1,10 @@
 import { prisma } from '../../config/database';
 import { generateToken, isTokenValid } from '../../config/jwt';
 import { logger } from '../../config/logger';
-
-const WHATSAPP_SENDER_NUMBER = '918898109059';
+import { sendDirectWhatsAppOtp } from '../../utils/whatsappBot';
 
 function normalizePhone(phone: string): string {
   return String(phone || '').replace(/\D/g, '').slice(-15);
-}
-
-async function sendWhatsAppOtp(formattedPhone: string, otp: string): Promise<void> {
-  const otpMessage =
-    `Your VatiKart verification code is: *${otp}*\n\n` +
-    'Valid for 10 minutes. Do not share this code with anyone.';
-
-  const whatsappEndpoint = process.env.WHATSAPP_SENDER_URL || 'http://localhost:3001/send-message';
-
-  try {
-    const response = await fetch(whatsappEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        senderNumber: WHATSAPP_SENDER_NUMBER,
-        recipientNumber: formattedPhone,
-        message: otpMessage,
-      }),
-    });
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => '');
-      throw new Error(`WhatsApp sender HTTP ${response.status}: ${body.slice(0, 200)}`);
-    }
-
-    console.log(`[otp] Real WhatsApp message sent to ${formattedPhone} from 8898109059`);
-    logger.info(`[otp] WhatsApp OTP dispatched to ${formattedPhone} via ${whatsappEndpoint}`);
-  } catch (err) {
-    console.warn('[otp] Self-hosted WhatsApp send error', err);
-    logger.warn('[otp] Self-hosted WhatsApp send error', err);
-  }
 }
 
 export class OtpService {
@@ -46,11 +14,8 @@ export class OtpService {
       throw new Error('Valid phone number is required');
     }
 
-    const formattedPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-
-    // Store last-10 for lookup consistency with order phone normalization
     const phone = cleanPhone.slice(-10);
 
     await prisma.otpVerification.deleteMany({ where: { phone } });
@@ -58,10 +23,12 @@ export class OtpService {
       data: { phone, otp, expiresAt },
     });
 
-    // Server-side only log — never returned to clients
     logger.info(`[otp] OTP generated for ${phone} (expires ${expiresAt.toISOString()})`);
 
-    await sendWhatsAppOtp(formattedPhone, otp);
+    const sent = await sendDirectWhatsAppOtp(phone, otp);
+    if (!sent) {
+      logger.warn(`[otp] WhatsApp delivery failed for ${phone} — bot may be offline / QR not scanned`);
+    }
 
     return { phone };
   }
@@ -83,7 +50,6 @@ export class OtpService {
       throw new Error('Invalid or expired OTP');
     }
 
-    // Single-use: delete on successful verify
     await prisma.otpVerification.deleteMany({ where: { phone } });
 
     const sessionToken = generateToken(
