@@ -75,6 +75,7 @@ app.get('/robots.txt', (req: Request, res: Response) => {
 
 // Mounting Module Routers
 app.use('/user', userRouter);
+app.use('/api/user', userRouter);
 app.use('/company', companyRouter);
 app.use('/catalogue', catalogueRouter);
 app.use('/product', productRouter);

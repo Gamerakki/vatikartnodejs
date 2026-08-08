@@ -171,6 +171,30 @@ export class UserController {
     }
   }
 
+  async updateProfile(req: Request, res: Response): Promise<void> {
+    const userId = res.locals.userId;
+    const { first_name, last_name } = req.body as { first_name?: string; last_name?: string };
+    const firstName = (first_name || '').trim();
+    const lastName = (last_name || '').trim();
+
+    if (!userId) {
+      res.status(401).json({ status: false, msg: 'Unauthorized' });
+      return;
+    }
+
+    if (!firstName) {
+      res.status(400).json({ status: false, msg: 'first_name is required' });
+      return;
+    }
+
+    try {
+      const data = await userService.updateProfile(userId, firstName, lastName);
+      res.status(200).json({ status: true, msg: 'Profile updated successfully', data });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: (err as Error).message });
+    }
+  }
+
   async fetchTeam(req: Request, res: Response): Promise<void> {
     try {
       const members = await userService.fetchTeam(res.locals.userId!);

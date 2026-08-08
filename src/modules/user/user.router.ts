@@ -13,6 +13,7 @@ router.post('/customer/push-token', userController.saveCustomerPushToken);
 // Authenticated routes
 router.get('/validate-token', validateAuth, userController.validateToken);
 router.post('/push-token', validateAuth, userController.savePushToken);
+router.put('/profile', validateAuth, userController.updateProfile);
 
 // Team management (OWNER only for mutations)
 router.get('/team', validateAuth, userController.fetchTeam);

@@ -78,6 +78,18 @@ export class UserService {
     };
   }
 
+  async updateProfile(userId: number, firstName: string, lastName: string) {
+    const updated = await userRepository.updateProfile(BigInt(userId), {
+      firstName: firstName.trim(),
+      lastName: lastName.trim() || null,
+    });
+    return {
+      user_id: Number(updated.userId),
+      first_name: updated.firstName,
+      last_name: updated.lastName,
+    };
+  }
+
   async checkExistingEmailAddress(emailId: string, userId: number): Promise<boolean> {
     return await userRepository.checkExistingEmailAddress(emailId, userId);
   }

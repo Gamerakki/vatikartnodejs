@@ -52,6 +52,16 @@ export class UserRepository {
     return count > 0;
   }
 
+  async updateProfile(userId: bigint, data: { firstName: string; lastName: string | null }) {
+    return await prisma.user.update({
+      where: { userId },
+      data: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+      },
+    });
+  }
+
   async updateLastActive(userId: number, date: Date) {
     return await prisma.user.update({
       where: {
